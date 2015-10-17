@@ -10,6 +10,7 @@ class Renderer
     ID3D11DeviceContext* mpDeviceContext;
 
     ComPtr<ID3D11Buffer> mpScenePositionVertexBuffer;
+	ComPtr<ID3D11Buffer> mpScenePositionNormalBuffer;
     ComPtr<ID3D11Buffer> mpSceneIndexBuffer;
     ComPtr<ID3D11Buffer> mpSceneInstanceBuffer;
     std::vector<D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS> mSceneDrawArgs;
@@ -18,6 +19,7 @@ class Renderer
     ComPtr<ID3D11PixelShader> mpScenePixelShader;
 
     ComPtr<ID3D11Buffer> mpCameraBuffer;
+	ComPtr<ID3D11Buffer> mpLightBuffer;
 
     ComPtr<ID3D11Texture2D> mpSceneDepthBuffer;
     ComPtr<ID3D11DepthStencilView> mpSceneDSV;

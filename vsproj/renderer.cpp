@@ -17,14 +17,39 @@ namespace SceneBufferBindings
     };
 }
 
+namespace ScenePSConstantBufferSlots
+{
+	enum
+	{
+		ScenePSLightBufferSlot
+	};
+}
+
+namespace SceneVSConstantBufferSlots
+{
+	enum
+	{
+		SceneVSCameraBufferSlot,
+	};
+}
+
 struct PerInstanceData
 {
     DirectX::XMFLOAT4X4 ModelWorld;
 };
 
+__declspec(align(16))
 struct CameraData
 {
     DirectX::XMFLOAT4X4 WorldViewProjection;
+};
+
+__declspec(align(16))
+struct LightData
+{
+	DirectX::XMFLOAT4 LightColor;
+	DirectX::XMFLOAT4 LightPosition;
+	float LightIntensity;
 };
 
 Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
@@ -58,6 +83,19 @@ void Renderer::LoadScene()
         initialData.SysMemPitch = (UINT) shapes[0].mesh.positions.size() * sizeof(float);
         CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, &initialData, &mpScenePositionVertexBuffer));
     }
+
+	// Create vertex normal buffer
+	{
+		D3D11_BUFFER_DESC bufferDesc{};
+		bufferDesc.ByteWidth = (UINT)shapes[0].mesh.normals.size() * sizeof(float);
+		bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+		D3D11_SUBRESOURCE_DATA initialData{};
+		initialData.pSysMem = shapes[0].mesh.normals.data();
+		initialData.SysMemPitch = (UINT)shapes[0].mesh.normals.size() * sizeof(float);
+		CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, &initialData, &mpScenePositionNormalBuffer));
+	}
 
     // Create index buffer
     {
@@ -111,6 +149,7 @@ void Renderer::LoadScene()
 
         D3D11_INPUT_ELEMENT_DESC inputElementDescs[] = {
             { "POSITION",   0, DXGI_FORMAT_R32G32B32_FLOAT,    SceneBufferBindings::PositionOnlyBuffer, 0,  D3D11_INPUT_PER_VERTEX_DATA,   0 },
+			{ "NORMAL",     0, DXGI_FORMAT_R32G32B32_FLOAT,    SceneBufferBindings::PositionOnlyBuffer, 0,  D3D11_INPUT_PER_VERTEX_DATA,   0 },
             { "MODELWORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  0,  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
             { "MODELWORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  16, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
             { "MODELWORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  32, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
@@ -131,7 +170,7 @@ void Renderer::LoadScene()
         depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
         depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS;
         CHECK_HR(mpDevice->CreateDepthStencilState(&depthStencilDesc, &mpSceneDepthStencilState));
-    }
+    }	
 
     // Create camera data
     {
@@ -143,6 +182,17 @@ void Renderer::LoadScene()
 
         CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpCameraBuffer));
     }
+
+	// Create light data
+	{
+		D3D11_BUFFER_DESC bufferDesc{};
+		bufferDesc.ByteWidth = sizeof(LightData);
+		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpLightBuffer));
+	}
 }
 
 void Renderer::Resize(int width, int height)
@@ -180,7 +230,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         CameraData* pCamera = (CameraData*)mappedCamera.pData;
 
         static float x = 0.0f;
-        x += 0.001f;
+        x += 0.01f;
         DirectX::XMVECTOR eye = DirectX::XMVectorSet(-15.0f * cos(x), 10.0f, -15.0f * sin(x), 1.0f);
         DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 3.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -192,6 +242,26 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
         mpDeviceContext->Unmap(mpCameraBuffer.Get(), 0);
     }
+
+	// Update light
+	{
+		D3D11_MAPPED_SUBRESOURCE mappedLight;
+		CHECK_HR(mpDeviceContext->Map(mpLightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedLight));
+
+		LightData* pLight = (LightData*)mappedLight.pData;
+
+		DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
+		DirectX::XMFLOAT4 lightPosition(0.f, 10.f, 0.f, 1.f);
+		static float x = 0.0f;
+		x += 0.01f;
+		float lightIntensity = (sin(x) + 1.f) * (sin(x) / 2) + 0.5;
+
+		pLight->LightColor = lightColor;
+		pLight->LightPosition = lightPosition;
+		pLight->LightIntensity = lightIntensity;
+
+		mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
+	}
 
     mpDeviceContext->OMSetRenderTargets(1, &pRTV, mpSceneDSV.Get());
 
@@ -227,6 +297,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
     mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
 
     mpDeviceContext->VSSetConstantBuffers(0, 1, mpCameraBuffer.GetAddressOf());
+	mpDeviceContext->PSSetConstantBuffers(0, 1, mpLightBuffer.GetAddressOf());
 
     for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
     {
