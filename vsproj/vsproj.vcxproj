@@ -123,6 +123,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ObjLoad.cpp" />
+    <ClCompile Include="tiny_obj_loader.cc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ObjLoad.h" />
+    <ClInclude Include="tiny_obj_loader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
