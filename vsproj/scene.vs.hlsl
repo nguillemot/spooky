@@ -5,7 +5,7 @@ cbuffer CameraCBV : register(b0)
 
 struct VS_INPUT
 {
-    float4 Position : SV_Position;
+    float4 Position : POSITION;
     float4x4 ModelWorld : MODELWORLD;
 };
 

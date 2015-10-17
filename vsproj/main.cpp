@@ -30,6 +30,7 @@ void InitApp()
 void ResizeApp(int width, int height)
 {
     CHECK_HR(gpSwapChain->ResizeBuffers(kSwapChainBufferCount, width, height, kSwapChainFormat, 0));
+    gpRenderer->Resize(width, height);
 }
 
 void UpdateApp()
@@ -48,10 +49,7 @@ void RenderApp()
     backBufferRTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
     CHECK_HR(gpDevice->CreateRenderTargetView(pBackBuffer.Get(), &backBufferRTVDesc, &pRTV));
 
-    D3D11_TEXTURE2D_DESC backBufferDesc;
-    pBackBuffer->GetDesc(&backBufferDesc);
-
-    gpRenderer->RenderFrame(pRTV.Get(), backBufferDesc.Width, backBufferDesc.Height);
+    gpRenderer->RenderFrame(pRTV.Get());
 }
 
 // Event handler
@@ -121,9 +119,9 @@ int main()
         CHECK_HR(D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, deviceFlags, NULL, 0, D3D11_SDK_VERSION, &scd, &gpSwapChain, &gpDevice, NULL, &gpDeviceContext));
     }
 
-    ShowWindow(ghWnd, SW_SHOWNORMAL);
-
     InitApp();
+
+    ShowWindow(ghWnd, SW_SHOWNORMAL);
 
     while (!gShouldClose)
     {

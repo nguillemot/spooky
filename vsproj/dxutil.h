@@ -16,6 +16,7 @@ using Microsoft::WRL::ComPtr;
         if (FAILED(hr)) { \
             _com_error err(hr); \
             OutputDebugString(err.ErrorMessage()); \
+            DebugBreak(); \
         } \
     } while (0)
 #else
