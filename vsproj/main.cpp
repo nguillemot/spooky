@@ -1,22 +1,12 @@
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <d3d11.h>
-#include <wrl/client.h>
-
 #include <cassert>
 #include <cstdio>
+#include <memory>
+
+#include "dxutil.h"
+#include "renderer.h"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
-
-#ifdef _DEBUG
-#define CHECK_HR(...) do { HRESULT hr = __VA_ARGS__; assert(SUCCEEDED(hr)); } while (0)
-#else
-#define CHECK_HR(...) __VA_ARGS__
-#endif
-
-using Microsoft::WRL::ComPtr;
 
 // Constants
 static const int kSwapChainBufferCount = 3;
@@ -28,10 +18,13 @@ bool gShouldClose;
 ComPtr<IDXGISwapChain> gpSwapChain;
 ComPtr<ID3D11Device> gpDevice;
 ComPtr<ID3D11DeviceContext> gpDeviceContext;
+std::unique_ptr<Renderer> gpRenderer;
 
 void InitApp()
 {
+    gpRenderer = std::make_unique<Renderer>(gpDevice.Get(), gpDeviceContext.Get());
 
+    gpRenderer->LoadScene();
 }
 
 void ResizeApp(int width, int height)
@@ -46,7 +39,19 @@ void UpdateApp()
 
 void RenderApp()
 {
+    ComPtr<ID3D11Texture2D> pBackBuffer;
+    CHECK_HR(gpSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer)));
 
+    ComPtr<ID3D11RenderTargetView> pRTV;
+    D3D11_RENDER_TARGET_VIEW_DESC backBufferRTVDesc{};
+    backBufferRTVDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+    backBufferRTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    CHECK_HR(gpDevice->CreateRenderTargetView(pBackBuffer.Get(), &backBufferRTVDesc, &pRTV));
+
+    D3D11_TEXTURE2D_DESC backBufferDesc;
+    pBackBuffer->GetDesc(&backBufferDesc);
+
+    gpRenderer->RenderFrame(pRTV.Get(), backBufferDesc.Width, backBufferDesc.Height);
 }
 
 // Event handler
@@ -111,7 +116,7 @@ int main()
         scd.OutputWindow = ghWnd;
         scd.Windowed = TRUE;
         scd.SampleDesc.Count = 1;
-        scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
         CHECK_HR(D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, deviceFlags, NULL, 0, D3D11_SDK_VERSION, &scd, &gpSwapChain, &gpDevice, NULL, &gpDeviceContext));
     }

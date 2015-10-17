@@ -2,11 +2,16 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="ObjLoad.cpp" />
     <ClCompile Include="tiny_obj_loader.cc" />
+    <ClCompile Include="renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tiny_obj_loader.h" />
-    <ClInclude Include="ObjLoad.h" />
+    <ClInclude Include="renderer.h" />
+    <ClInclude Include="dxutil.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="scene.vs.hlsl" />
+    <FxCompile Include="scene.ps.hlsl" />
   </ItemGroup>
 </Project>
