@@ -3,9 +3,13 @@
 #include <DirectXMath.h>
 
 #include "tiny_obj_loader.h"
+#include "DDSTextureLoader.h"
 
 #include "scene.vs.hlsl.h"
 #include "scene.ps.hlsl.h"
+
+#include "skybox.vs.hlsl.h"
+#include "skybox.ps.hlsl.h"
 
 namespace SceneBufferBindings
 {
@@ -17,6 +21,30 @@ namespace SceneBufferBindings
     };
 }
 
+namespace SkyboxVSConstantBufferSlots
+{
+    enum
+    {
+        CameraCBV
+    };
+}
+
+namespace SkyboxPSShaderResourceSlots
+{
+    enum
+    {
+        SkyboxTextureSRV
+    };
+}
+
+namespace SkyboxPSSamplerSlots
+{
+    enum
+    {
+        SkyboxSMP
+    };
+}
+
 struct PerInstanceData
 {
     DirectX::XMFLOAT4X4 ModelWorld;
@@ -25,6 +53,7 @@ struct PerInstanceData
 struct CameraData
 {
     DirectX::XMFLOAT4X4 WorldViewProjection;
+    DirectX::XMFLOAT4 EyePosition;
 };
 
 Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
@@ -119,17 +148,12 @@ void Renderer::LoadScene()
 
         CHECK_HR(mpDevice->CreateInputLayout(inputElementDescs, _countof(inputElementDescs), g_scene_vs, sizeof(g_scene_vs), &mpSceneInputLayout));
 
-        D3D11_RASTERIZER_DESC rasterizerDesc{};
-        rasterizerDesc.FillMode = D3D11_FILL_SOLID;
+        D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT());
         rasterizerDesc.CullMode = D3D11_CULL_NONE;
         rasterizerDesc.FrontCounterClockwise = TRUE;
-        rasterizerDesc.DepthClipEnable = TRUE;
         CHECK_HR(mpDevice->CreateRasterizerState(&rasterizerDesc, &mpSceneRasterizerState));
 
-        D3D11_DEPTH_STENCIL_DESC depthStencilDesc{};
-        depthStencilDesc.DepthEnable = TRUE;
-        depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-        depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS;
+        D3D11_DEPTH_STENCIL_DESC depthStencilDesc = CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT());
         CHECK_HR(mpDevice->CreateDepthStencilState(&depthStencilDesc, &mpSceneDepthStencilState));
     }
 
@@ -142,6 +166,32 @@ void Renderer::LoadScene()
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
         CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpCameraBuffer));
+    }
+
+    // Load skybox texture
+    {
+        CHECK_HR(mpDevice->CreateVertexShader(g_skybox_vs, sizeof(g_skybox_vs), NULL, &mpSkyboxVertexShader));
+        CHECK_HR(mpDevice->CreatePixelShader(g_skybox_ps, sizeof(g_skybox_ps), NULL, &mpSkyboxPixelShader));
+
+        CHECK_HR(DirectX::CreateDDSTextureFromFileEx(
+            mpDevice, mpDeviceContext,
+            L"Skyboxes/grimmnight.dds",
+            (size_t)0, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, D3D11_RESOURCE_MISC_TEXTURECUBE, true,
+            &mpSkyboxTexture, &mpSkyboxTextureSRV, nullptr));
+
+        D3D11_SAMPLER_DESC skyboxSamplerDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
+        CHECK_HR(mpDevice->CreateSamplerState(&skyboxSamplerDesc, &mpSkyboxSampler));
+    }
+
+    // Create skybox pipeline state
+    {
+        D3D11_RASTERIZER_DESC skyboxRasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT());
+        skyboxRasterizerDesc.CullMode = D3D11_CULL_NONE;
+        CHECK_HR(mpDevice->CreateRasterizerState(&skyboxRasterizerDesc, &mpSkyboxRasterizerState));
+
+        D3D11_DEPTH_STENCIL_DESC skyboxDepthStencilDesc = CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT());
+        skyboxDepthStencilDesc.DepthEnable = FALSE;
+        CHECK_HR(mpDevice->CreateDepthStencilState(&skyboxDepthStencilDesc, &mpSkyboxDepthStencilState));
     }
 }
 
@@ -181,14 +231,15 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
         static float x = 0.0f;
         x += 0.001f;
-        DirectX::XMVECTOR eye = DirectX::XMVectorSet(-15.0f * cos(x), 10.0f, -15.0f * sin(x), 1.0f);
+        DirectX::XMVECTOR eye = DirectX::XMVectorSet(-15.0f * cos(x), -30.0f, -15.0f * sin(x), 1.0f);
         DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 3.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         DirectX::XMMATRIX worldView = DirectX::XMMatrixLookAtLH(eye, center, up);
-        DirectX::XMMATRIX viewProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(45.0f), (float)mClientHeight / mClientWidth, 0.01f, 100.0f);
+        DirectX::XMMATRIX viewProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(45.0f), (float)mClientHeight / mClientWidth, 0.01f, 1000.0f);
         DirectX::XMMATRIX worldViewProjection = worldView * viewProjection;
 
         DirectX::XMStoreFloat4x4(&pCamera->WorldViewProjection, DirectX::XMMatrixTranspose(worldViewProjection));
+        DirectX::XMStoreFloat4(&pCamera->EyePosition, eye);
 
         mpDeviceContext->Unmap(mpCameraBuffer.Get(), 0);
     }
@@ -205,6 +256,20 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     mpDeviceContext->RSSetViewports(1, &viewport);
+
+    // Draw skybox
+    {
+        mpDeviceContext->VSSetShader(mpSkyboxVertexShader.Get(), NULL, 0);
+        mpDeviceContext->PSSetShader(mpSkyboxPixelShader.Get(), NULL, 0);
+        mpDeviceContext->IASetInputLayout(nullptr);
+        mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST); 
+        mpDeviceContext->RSSetState(mpSkyboxRasterizerState.Get());
+        mpDeviceContext->OMSetDepthStencilState(mpSkyboxDepthStencilState.Get(), 0);
+        mpDeviceContext->VSSetConstantBuffers(SkyboxVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
+        mpDeviceContext->PSSetShaderResources(SkyboxPSShaderResourceSlots::SkyboxTextureSRV, 1, mpSkyboxTextureSRV.GetAddressOf());
+        mpDeviceContext->PSSetSamplers(SkyboxPSSamplerSlots::SkyboxSMP, 1, mpSkyboxSampler.GetAddressOf());
+        mpDeviceContext->Draw(36, 0);
+    }
 
     ID3D11Buffer* pSceneVertexBuffers[SceneBufferBindings::Count]{};
     UINT sceneStrides[SceneBufferBindings::Count]{};

@@ -1,6 +1,8 @@
+#include "common.hlsl"
+
 cbuffer CameraCBV : register(b0)
 {
-    float4x4 WorldViewProjection;
+    CameraData Camera;
 };
 
 struct VS_INPUT
@@ -17,6 +19,6 @@ struct VS_OUTPUT
 VS_OUTPUT main(VS_INPUT input)
 {
     VS_OUTPUT output;
-    output.Position = mul(mul(input.Position, input.ModelWorld), WorldViewProjection);
+    output.Position = mul(mul(input.Position, input.ModelWorld), Camera.WorldViewProjection);
     return output;
 }
