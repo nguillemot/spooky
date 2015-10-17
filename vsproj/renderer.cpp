@@ -41,8 +41,8 @@ void Renderer::LoadScene()
     std::string err = tinyobj::LoadObj(shapes, materials, inputfile.c_str(), "Models/");
 
     if (!err.empty()) {
-        assert(false);
         OutputDebugStringA(err.c_str());
+        assert(false);
         exit(1);
     }
 
@@ -172,7 +172,7 @@ void Renderer::Resize(int width, int height)
 
 void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 {
-    // Updata camera
+    // Update camera
     {
         D3D11_MAPPED_SUBRESOURCE mappedCamera;
         CHECK_HR(mpDeviceContext->Map(mpCameraBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedCamera));
@@ -223,7 +223,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
     mpDeviceContext->VSSetShader(mpSceneVertexShader.Get(), NULL, 0);
     mpDeviceContext->PSSetShader(mpScenePixelShader.Get(), NULL, 0);
     mpDeviceContext->IASetInputLayout(mpSceneInputLayout.Get());
-    mpDeviceContext->RSGetState(mpSceneRasterizerState.GetAddressOf());
+    mpDeviceContext->RSSetState(mpSceneRasterizerState.Get());
     mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
 
     mpDeviceContext->VSSetConstantBuffers(0, 1, mpCameraBuffer.GetAddressOf());

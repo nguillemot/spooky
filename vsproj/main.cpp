@@ -30,6 +30,7 @@ void InitApp()
 void ResizeApp(int width, int height)
 {
     CHECK_HR(gpSwapChain->ResizeBuffers(kSwapChainBufferCount, width, height, kSwapChainFormat, 0));
+
     gpRenderer->Resize(width, height);
 }
 
@@ -43,13 +44,13 @@ void RenderApp()
     ComPtr<ID3D11Texture2D> pBackBuffer;
     CHECK_HR(gpSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer)));
 
-    ComPtr<ID3D11RenderTargetView> pRTV;
-    D3D11_RENDER_TARGET_VIEW_DESC backBufferRTVDesc{};
-    backBufferRTVDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-    backBufferRTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-    CHECK_HR(gpDevice->CreateRenderTargetView(pBackBuffer.Get(), &backBufferRTVDesc, &pRTV));
-
-    gpRenderer->RenderFrame(pRTV.Get());
+    D3D11_RENDER_TARGET_VIEW_DESC rtvDesc{};
+    rtvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+    rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    ComPtr<ID3D11RenderTargetView> pBackBufferRTV;
+    CHECK_HR(gpDevice->CreateRenderTargetView(pBackBuffer.Get(), &rtvDesc, &pBackBufferRTV));
+ 
+    gpRenderer->RenderFrame(pBackBufferRTV.Get());
 }
 
 // Event handler
@@ -114,7 +115,7 @@ int main()
         scd.OutputWindow = ghWnd;
         scd.Windowed = TRUE;
         scd.SampleDesc.Count = 1;
-        scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+        scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
         CHECK_HR(D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, deviceFlags, NULL, 0, D3D11_SDK_VERSION, &scd, &gpSwapChain, &gpDevice, NULL, &gpDeviceContext));
     }
