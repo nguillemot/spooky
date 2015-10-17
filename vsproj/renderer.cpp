@@ -352,7 +352,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
         static float x = 0.0f;
         x += 0.01f;
-        DirectX::XMVECTOR eye = DirectX::XMVectorSet(-15.0f * cos(x), 10.0f, -15.0f * sin(x), 1.0f);
+        DirectX::XMVECTOR eye = DirectX::XMVectorSet(-15.0f * cos(x), -10.0f, -15.0f * sin(x), 1.0f);
         DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 3.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         DirectX::XMMATRIX worldView = DirectX::XMMatrixLookAtLH(eye, center, up);
