@@ -141,4 +141,6 @@ int main()
         // Swap buffers
         CHECK_HR(gpSwapChain->Present(0, 0));
     }
+
+    CHECK_HR(gpSwapChain->SetFullscreenState(FALSE, NULL));
 }
