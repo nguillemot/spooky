@@ -3,7 +3,9 @@
 #include <Windows.h>
 #include <d3d11.h>
 #include <wrl/client.h>
+
 #include <cassert>
+#include <cstdio>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -16,12 +18,48 @@
 
 using Microsoft::WRL::ComPtr;
 
+// Constants
+static const int kSwapChainBufferCount = 3;
+static const DXGI_FORMAT kSwapChainFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+
+// Globals
+HWND ghWnd;
+bool gShouldClose;
+ComPtr<IDXGISwapChain> gpSwapChain;
+ComPtr<ID3D11Device> gpDevice;
+ComPtr<ID3D11DeviceContext> gpDeviceContext;
+
+void InitApp()
+{
+
+}
+
+void ResizeApp(int width, int height)
+{
+    CHECK_HR(gpSwapChain->ResizeBuffers(kSwapChainBufferCount, width, height, kSwapChainFormat, 0));
+}
+
+void UpdateApp()
+{
+
+}
+
+void RenderApp()
+{
+
+}
+
+// Event handler
 LRESULT CALLBACK MyWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
     case WM_CLOSE:
-        ExitProcess(0);
+        gShouldClose = true;
+        return 0;
+    case WM_SIZE:
+        ResizeApp(LOWORD(lParam), HIWORD(lParam));
+        return 0;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
@@ -29,7 +67,7 @@ LRESULT CALLBACK MyWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 
 int main()
 {
-    HWND hWnd;
+    // Create window
     {
         WNDCLASSEX wc;
         ZeroMemory(&wc, sizeof(wc));
@@ -44,16 +82,14 @@ int main()
 
         RECT wr = { 0, 0, 640, 480 };
         AdjustWindowRect(&wr, 0, FALSE);
-        hWnd = CreateWindowEx(
+        ghWnd = CreateWindowEx(
             0, TEXT("WindowClass"),
             TEXT("Spooky"), WS_OVERLAPPEDWINDOW,
             0, 0, wr.right - wr.left, wr.bottom - wr.top,
             0, 0, GetModuleHandle(NULL), 0);
     }
 
-    ComPtr<IDXGISwapChain> pSwapChain;
-    ComPtr<ID3D11Device> pDevice;
-    ComPtr<ID3D11DeviceContext> pDeviceContext;
+    // Create D3D11 device and swap chain
     {
         ComPtr<IDXGIFactory> pFactory;
         CHECK_HR(CreateDXGIFactory(IID_PPV_ARGS(&pFactory)));
@@ -64,26 +100,29 @@ int main()
 #endif
 
         RECT clientRect;
-        GetClientRect(hWnd, &clientRect);
+        GetClientRect(ghWnd, &clientRect);
 
         DXGI_SWAP_CHAIN_DESC scd{};
-        scd.BufferCount = 3;
-        scd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        scd.BufferCount = kSwapChainBufferCount;
+        scd.BufferDesc.Format = kSwapChainFormat;
         scd.BufferDesc.Width = clientRect.right - clientRect.left;
         scd.BufferDesc.Height = clientRect.bottom - clientRect.top;
         scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        scd.OutputWindow = hWnd;
+        scd.OutputWindow = ghWnd;
         scd.Windowed = TRUE;
         scd.SampleDesc.Count = 1;
         scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
-        CHECK_HR(D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, deviceFlags, NULL, 0, D3D11_SDK_VERSION, &scd, &pSwapChain, &pDevice, NULL, &pDeviceContext));
+        CHECK_HR(D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, deviceFlags, NULL, 0, D3D11_SDK_VERSION, &scd, &gpSwapChain, &gpDevice, NULL, &gpDeviceContext));
     }
 
-    ShowWindow(hWnd, SW_SHOWNORMAL);
+    ShowWindow(ghWnd, SW_SHOWNORMAL);
 
-    while (true)
+    InitApp();
+
+    while (!gShouldClose)
     {
+        // Handle all events
         MSG msg;
         while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) > 0)
         {
@@ -91,6 +130,11 @@ int main()
             DispatchMessage(&msg);
         }
 
-        CHECK_HR(pSwapChain->Present(0, 0));
+        UpdateApp();
+
+        RenderApp();
+
+        // Swap buffers
+        CHECK_HR(gpSwapChain->Present(0, 0));
     }
 }
