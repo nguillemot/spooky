@@ -71,50 +71,112 @@ void Renderer::LoadScene()
         exit(1);
     }
 
-    // Create position vertex buffer
-    {
-        D3D11_BUFFER_DESC bufferDesc{};
-        bufferDesc.ByteWidth = (UINT) shapes[0].mesh.positions.size() * sizeof(float);
-        bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-        bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    // Create position vertex staging buffer
+	{
+		D3D11_BUFFER_DESC stagingBufferDesc{};
+		UINT bufferSize = 0;
+		for (int i = 0; i < shapes.size(); ++i) {
+			bufferSize += (UINT)shapes[i].mesh.positions.size() * sizeof(float);
+		}
+		stagingBufferDesc.ByteWidth = bufferSize;
+		stagingBufferDesc.Usage = D3D11_USAGE_STAGING;
+		stagingBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		ComPtr<ID3D11Buffer> stagingBuffer;
+		CHECK_HR(mpDevice->CreateBuffer(&stagingBufferDesc, NULL, &stagingBuffer));
 
-        D3D11_SUBRESOURCE_DATA initialData{};
-        initialData.pSysMem = shapes[0].mesh.positions.data();
-        initialData.SysMemPitch = (UINT) shapes[0].mesh.positions.size() * sizeof(float);
-        CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, &initialData, &mpScenePositionVertexBuffer));
+		D3D11_MAPPED_SUBRESOURCE mappedBuffer;
+		CHECK_HR(mpDeviceContext->Map(stagingBuffer.Get(), 0, D3D11_MAP_WRITE, 0, &mappedBuffer));
+		
+		float* pData = (float*) mappedBuffer.pData;
+		for (int i = 0; i < shapes.size(); ++i) {
+			memcpy(pData, shapes[i].mesh.positions.data(), sizeof(float) * shapes[i].mesh.positions.size());
+			pData += shapes[i].mesh.positions.size();
+		}
+
+		mpDeviceContext->Unmap(stagingBuffer.Get(), 0);
+
+	// Create vertex position buffer
+        D3D11_BUFFER_DESC bufferDesc{};
+        bufferDesc.ByteWidth = bufferSize;
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        
+        CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpScenePositionVertexBuffer));
+		mpDeviceContext->CopyResource(mpScenePositionVertexBuffer.Get(), stagingBuffer.Get());
     }
 
-	// Create vertex normal buffer
+	// Create vertex normal staging buffer
 	{
+		D3D11_BUFFER_DESC stagingBufferDesc{};
+		UINT bufferSize = 0;
+		for (int i = 0; i < shapes.size(); ++i) {
+			bufferSize += (UINT)shapes[i].mesh.normals.size() * sizeof(float);
+		}
+		stagingBufferDesc.ByteWidth = bufferSize;
+		stagingBufferDesc.Usage = D3D11_USAGE_STAGING;
+		stagingBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		ComPtr<ID3D11Buffer> stagingBuffer;
+		CHECK_HR(mpDevice->CreateBuffer(&stagingBufferDesc, NULL, &stagingBuffer));
+
+		D3D11_MAPPED_SUBRESOURCE mappedBuffer;
+		CHECK_HR(mpDeviceContext->Map(stagingBuffer.Get(), 0, D3D11_MAP_WRITE, 0, &mappedBuffer));
+
+		float* pData = (float*)mappedBuffer.pData;
+		for (int i = 0; i < shapes.size(); ++i) {
+			memcpy(pData, shapes[i].mesh.normals.data(), sizeof(float) * shapes[i].mesh.normals.size());
+			pData += shapes[i].mesh.normals.size();
+		}
+
+		mpDeviceContext->Unmap(stagingBuffer.Get(), 0);
+
+		// Create vertex normal buffer
 		D3D11_BUFFER_DESC bufferDesc{};
-		bufferDesc.ByteWidth = (UINT)shapes[0].mesh.normals.size() * sizeof(float);
-		bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+		bufferDesc.ByteWidth = bufferSize;
+		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 
-		D3D11_SUBRESOURCE_DATA initialData{};
-		initialData.pSysMem = shapes[0].mesh.normals.data();
-		initialData.SysMemPitch = (UINT)shapes[0].mesh.normals.size() * sizeof(float);
-		CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, &initialData, &mpScenePositionNormalBuffer));
+		CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpScenePositionNormalBuffer));
+		mpDeviceContext->CopyResource(mpScenePositionNormalBuffer.Get(), stagingBuffer.Get());
 	}
 
-    // Create index buffer
-    {
-        D3D11_BUFFER_DESC bufferDesc{};
-        bufferDesc.ByteWidth = (UINT) shapes[0].mesh.indices.size() * sizeof(uint32_t);
-        bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-        bufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	// Create position vertex staging buffer
+	{
+		D3D11_BUFFER_DESC stagingBufferDesc{};
+		UINT bufferSize = 0;
+		for (int i = 0; i < shapes.size(); ++i) {
+			bufferSize += (UINT)shapes[i].mesh.indices.size() * sizeof(uint32_t);
+		}
+		stagingBufferDesc.ByteWidth = bufferSize;
+		stagingBufferDesc.Usage = D3D11_USAGE_STAGING;
+		stagingBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		ComPtr<ID3D11Buffer> stagingBuffer;
+		CHECK_HR(mpDevice->CreateBuffer(&stagingBufferDesc, NULL, &stagingBuffer));
 
-        static_assert(std::is_same<uint32_t, unsigned int>::value, "assuming unsigned int is uint32_t");
+		D3D11_MAPPED_SUBRESOURCE mappedBuffer;
+		CHECK_HR(mpDeviceContext->Map(stagingBuffer.Get(), 0, D3D11_MAP_WRITE, 0, &mappedBuffer));
 
-        D3D11_SUBRESOURCE_DATA initialData{};
-        initialData.pSysMem = shapes[0].mesh.indices.data();
-        initialData.SysMemPitch = (UINT) shapes[0].mesh.indices.size() * sizeof(uint32_t);
-        CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, &initialData, &mpSceneIndexBuffer));
-    }
+		uint32_t* pData = (uint32_t*)mappedBuffer.pData;
+		for (int i = 0; i < shapes.size(); ++i) {
+			memcpy(pData, shapes[i].mesh.indices.data(), sizeof(uint32_t) * shapes[i].mesh.indices.size());
+			pData += shapes[i].mesh.indices.size();
+		}
+
+		mpDeviceContext->Unmap(stagingBuffer.Get(), 0);
+
+		// Create vertex position buffer
+		D3D11_BUFFER_DESC bufferDesc{};
+		bufferDesc.ByteWidth = bufferSize;
+		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+		bufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+
+		CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpSceneIndexBuffer));
+		mpDeviceContext->CopyResource(mpSceneIndexBuffer.Get(), stagingBuffer.Get());
+	}
+
 
     // Create instance buffer
     {
-        int totalNumInstances = 1;
+        UINT totalNumInstances = (UINT) shapes.size();
 
         D3D11_BUFFER_DESC bufferDesc{};
         bufferDesc.ByteWidth = sizeof(PerInstanceData) * totalNumInstances;
@@ -136,10 +198,19 @@ void Renderer::LoadScene()
 
     // Create the list of draws to render the scene
     {
-        D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS drawArgs{};
-        drawArgs.IndexCountPerInstance = (UINT) shapes[0].mesh.indices.size();
-        drawArgs.InstanceCount = 1;
-        mSceneDrawArgs.push_back(drawArgs);
+		UINT startIndex = 0;
+		UINT baseIndex = 0;
+		for (int i = 0; i < shapes.size(); ++i) {
+			D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS drawArgs{};
+			drawArgs.IndexCountPerInstance = (UINT)shapes[i].mesh.indices.size();
+			drawArgs.InstanceCount = 1;
+			drawArgs.StartIndexLocation = startIndex;
+			drawArgs.BaseVertexLocation = baseIndex;
+			drawArgs.StartInstanceLocation = i;
+			mSceneDrawArgs.push_back(drawArgs);
+			startIndex += (UINT)shapes[i].mesh.indices.size();
+			baseIndex += (UINT)shapes[i].mesh.positions.size() / 3;
+		}
     }
 
     // Create pipeline state
@@ -254,7 +325,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 		DirectX::XMFLOAT4 lightPosition(0.f, 10.f, 0.f, 1.f);
 		static float x = 0.0f;
 		x += 0.01f;
-		float lightIntensity = (sin(x) + 1.f) * (sin(x) / 2) + 0.5;
+		float lightIntensity = (sin(x) + 1.f) * (sin(x) / 2) + 0.5f;
 
 		pLight->LightColor = lightColor;
 		pLight->LightPosition = lightPosition;
