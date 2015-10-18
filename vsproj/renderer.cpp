@@ -74,6 +74,14 @@ namespace WaterVSConstantBufferSlots
     };
 }
 
+namespace WaterPSConstantBufferSlots
+{
+    enum
+    {
+        TimeCBV
+    };
+}
+
 namespace WaterPSShaderResourceSlots
 {
     enum
@@ -111,10 +119,18 @@ struct LightData
     float LightIntensity;
 };
 
+__declspec(align(16))
+struct TimeData
+{
+    float TimeSinceStart_sec;
+};
+
 Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
     : mpDevice(pDevice)
     , mpDeviceContext(pDeviceContext)
-{ }
+{
+    mTimeSinceStart_sec = 0.0;
+}
 
 void Renderer::Init()
 {
@@ -324,6 +340,17 @@ void Renderer::Init()
         }
     }
 
+    // Time buffer
+    {
+        D3D11_BUFFER_DESC bufferDesc{};
+        bufferDesc.ByteWidth = sizeof(TimeData);
+        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+        CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpTimeBuffer));
+    }
+
     // Create camera data
     {
         D3D11_BUFFER_DESC bufferDesc{};
@@ -395,6 +422,8 @@ void Renderer::Init()
             &mpWaterDepthTexture, &mpWaterDepthTextureSRV, nullptr));
 
         D3D11_SAMPLER_DESC waterSamplerDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
+        waterSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+        waterSamplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
         CHECK_HR(mpDevice->CreateSamplerState(&waterSamplerDesc, &mpWaterDepthSampler));
     }
 
@@ -427,7 +456,7 @@ void Renderer::Resize(int width, int height)
 
 void Renderer::Update(int deltaTime_ms)
 {
-
+    mTimeSinceStart_sec += deltaTime_ms * 0.001f;
 }
 
 void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& camera)
@@ -461,15 +490,26 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
 
         DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
         DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 0.f, 1.f);
-        static float x = 0.0f;
-        x += 0.01f;
-        float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + (2.f / 3.f);
+        float t = (float)mTimeSinceStart_sec;
+        float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
 
         pLight->LightColor = lightColor;
         pLight->LightPosition = lightPosition;
         pLight->LightIntensity = lightIntensity;
 
         mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
+    }
+
+    // Update time
+    {
+        D3D11_MAPPED_SUBRESOURCE mappedTime;
+        CHECK_HR(mpDeviceContext->Map(mpTimeBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedTime));
+
+        TimeData* pTime = (TimeData*)mappedTime.pData;
+
+        pTime->TimeSinceStart_sec = (float)mTimeSinceStart_sec;
+
+        mpDeviceContext->Unmap(mpTimeBuffer.Get(), 0);
     }
 
     // Do this in each draw - load material buffer with appropriate material data
@@ -561,6 +601,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->OMSetBlendState(mpWaterBlendState.Get(), NULL, UINT_MAX);
         mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
         mpDeviceContext->VSSetConstantBuffers(WaterVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
+        mpDeviceContext->PSSetConstantBuffers(WaterPSConstantBufferSlots::TimeCBV, 1, mpTimeBuffer.GetAddressOf());
         mpDeviceContext->PSSetShaderResources(WaterPSShaderResourceSlots::WaterDepthSRV, 1, mpWaterDepthTextureSRV.GetAddressOf());
         mpDeviceContext->PSSetSamplers(WaterPSSamplerSlots::WaterDepthSMP, 1, mpWaterDepthSampler.GetAddressOf());
         mpDeviceContext->Draw(6, 0);
