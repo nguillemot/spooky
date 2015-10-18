@@ -168,7 +168,9 @@ struct TimeData
 Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
     : mpDevice(pDevice)
     , mpDeviceContext(pDeviceContext)
+    , mFogRNG(std::random_device()())
 {
+    mTotalFogParticlesMade = 0;
     mTimeSinceStart_sec = 0.0;
 }
 
@@ -526,14 +528,21 @@ void Renderer::Update(int deltaTime_ms)
     float deltaTime_sec = deltaTime_ms * 0.001f;
     mTimeSinceStart_sec += deltaTime_sec;
 
-    static const float kTimeToDeath = 5.0f;
+    static const float kParticleFrequency = 1.0f;
 
-    mFogCPUParticles.resize(5);
-    for (size_t i = 0; i < mFogCPUParticles.size(); i++)
+    size_t particlesToMake = (size_t)(mTimeSinceStart_sec * kParticleFrequency) - size_t(mTotalFogParticlesMade);
+    for (size_t i = 0; i < particlesToMake; i++)
     {
-        mFogCPUParticles[i].Intensity = 1.0f;
-        DirectX::XMStoreFloat3(&mFogCPUParticles[i].WorldPosition, DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f));
+        FogParticleData particle{};
+        particle.Intensity = 1.0f;
+        float x = mFogDistribution(mFogRNG) * 10.0f;
+        float y = mFogDistribution(mFogRNG);
+        float z = mFogDistribution(mFogRNG) * 10.0f;
+        DirectX::XMStoreFloat3(&particle.WorldPosition, DirectX::XMVectorSet(x, y, z, 1.0f));
+        mFogCPUParticles.push_back(particle);
     }
+
+    static const float kTimeToDeath = 5.0f;
 
     // Update particles
     for (size_t i = 0; i < mFogCPUParticles.size(); i++)
@@ -590,7 +599,6 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         pLight->LightPosition = lightPosition;
         pLight->LightIntensity = lightIntensity;
         pLight->AmbientLightColor = ambColor;
-
 
         if (!DebugOutput) {
             std::cout << "Light Information" << '\n';

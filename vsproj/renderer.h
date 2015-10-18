@@ -5,6 +5,7 @@
 #include <DirectXMath.h>
 
 #include <vector>
+#include <random>
 
 class Renderer
 {
@@ -78,6 +79,10 @@ class Renderer
 
     std::vector<FogParticleData> mFogCPUParticles;
     ComPtr<ID3D11Buffer> mpFogGPUParticles;
+
+    std::mt19937 mFogRNG;
+    std::normal_distribution<float> mFogDistribution;
+    int mTotalFogParticlesMade;
 
     int mClientWidth;
     int mClientHeight;
