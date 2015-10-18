@@ -27,24 +27,21 @@ struct VS_OUTPUT
 2 ---- 3
 
      +y
-     ^
-     |
-     |
+     ^    +z
+     |   ^
+     |  /
+     | / 
    center -----> +x
-    /
-   /
-  v
- +z
 */
 static const float3 kCorners[8] = {
-    float3(-1, +1, +1),
-    float3(+1, +1, +1),
-    float3(-1, -1, +1),
-    float3(+1, -1, +1),
     float3(-1, +1, -1),
     float3(+1, +1, -1),
     float3(-1, -1, -1),
-    float3(+1, -1, -1)
+    float3(+1, -1, -1),
+    float3(-1, +1, +1),
+    float3(+1, +1, +1),
+    float3(-1, -1, +1),
+    float3(+1, -1, +1)
 };
 
 static const uint kCubeIndices[36] = {
@@ -68,6 +65,6 @@ VS_OUTPUT main(VS_INPUT input)
     float4 worldCornerDirection = float4(kCorners[kCubeIndices[input.VertexID]], 0.0);
     float4 worldCornerPosition = float4(Camera.EyePosition.xyz + worldCornerDirection.xyz, 1.0);
     output.Position = mul(worldCornerPosition, Camera.WorldViewProjection);
-    output.CubeMapDirection = worldCornerDirection;
+    output.CubeMapDirection = worldCornerDirection * 1000;
     return output;
 }

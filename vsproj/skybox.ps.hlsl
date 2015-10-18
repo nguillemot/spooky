@@ -15,7 +15,6 @@ struct PS_OUTPUT
 PS_OUTPUT main(PS_INPUT input)
 {
     PS_OUTPUT output;
-    // output.Color = float4(normalize(input.CubeMapDirection.xyz), 1.0);
-    output.Color = SkyboxTexture.Sample(SkyboxSampler, input.CubeMapDirection.xyz, 0);
+    output.Color = SkyboxTexture.Sample(SkyboxSampler, input.CubeMapDirection.xyz);
     return output;
 }

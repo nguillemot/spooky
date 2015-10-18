@@ -65,8 +65,8 @@ namespace SkyboxPSSamplerSlots
 struct Material
 {
 	DirectX::XMFLOAT3 AmbientColor;
-	DirectX::XMFLOAT3 SpecularColor;
 	DirectX::XMFLOAT3 DiffuseColor;
+	DirectX::XMFLOAT3 SpecularColor;
 	float Ns;
 };
 
@@ -75,7 +75,6 @@ struct PerInstanceData
     DirectX::XMFLOAT4X4 ModelWorld;
 	Material InstanceMaterial;
 };
-
 
 __declspec(align(16))
 struct CameraData
@@ -228,13 +227,6 @@ void Renderer::LoadScene()
         for (PerInstanceData& instance : initialPerInstanceData)
         {
             DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixIdentity());
-			DirectX::XMFLOAT3 ambient(materials[0].ambient[0], materials[0].ambient[1], materials[0].ambient[2]);
-			DirectX::XMFLOAT3 specular(materials[0].specular[0], materials[0].specular[1], materials[0].specular[2]);
-			DirectX::XMFLOAT3 diffuse(materials[0].diffuse[0], materials[0].diffuse[1], materials[0].diffuse[2]);
-			instance.InstanceMaterial.Ns = materials[0].shininess;
-			instance.InstanceMaterial.AmbientColor = ambient;
-			instance.InstanceMaterial.DiffuseColor = diffuse;
-			instance.InstanceMaterial.SpecularColor = specular;
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
@@ -308,6 +300,7 @@ void Renderer::LoadScene()
             &mpSkyboxTexture, &mpSkyboxTextureSRV, nullptr));
 
         D3D11_SAMPLER_DESC skyboxSamplerDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
+        skyboxSamplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
         CHECK_HR(mpDevice->CreateSamplerState(&skyboxSamplerDesc, &mpSkyboxSampler));
     }
 
@@ -369,9 +362,9 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         CameraData* pCamera = (CameraData*)mappedCamera.pData;
 
         static float x = 0.0f;
-        x += 0.01f;
-        DirectX::XMVECTOR eye = DirectX::XMVectorSet(-20.0f * cos(x), 6.0f, -20.0f * sin(x), 1.0f);
-        DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 3.0f, 0.0f, 1.0f);
+        x += 0.005f;
+        DirectX::XMVECTOR eye = DirectX::XMVectorSet(50.0f * cos(x), 0.0f, 50.0f * sin(x), 1.0f);
+        DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         DirectX::XMMATRIX worldView = DirectX::XMMatrixLookAtLH(eye, center, up);
         DirectX::XMMATRIX viewProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(45.0f), (float)mClientHeight / mClientWidth, 0.01f, 1000.0f);
@@ -391,10 +384,10 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         LightData* pLight = (LightData*)mappedLight.pData;
 
         DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
-        DirectX::XMFLOAT4 lightPosition(0.f, 10.f, 3.f, 1.f);
+        DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 0.f, 1.f);
         static float x = 0.0f;
         x += 0.01f;
-        float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + (1.f/3.f);
+        float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + (2.f/3.f);
 
         pLight->LightColor = lightColor;
         pLight->LightPosition = lightPosition;
