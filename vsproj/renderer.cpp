@@ -138,13 +138,6 @@ namespace FogPSSamplerSlots
 }
 
 __declspec(align(16))
-struct PerInstanceData
-{
-    DirectX::XMFLOAT4X4 ModelWorld;
-    UINT materialID;
-};
-
-__declspec(align(16))
 struct CameraData
 {
     DirectX::XMFLOAT4X4 WorldViewProjection;
@@ -152,8 +145,6 @@ struct CameraData
     DirectX::XMFLOAT4X4 ViewProjection;
     DirectX::XMFLOAT4 EyePosition;
 };
-
-
 
 __declspec(align(16))
 struct TimeData
@@ -174,6 +165,9 @@ Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
     for (PointLight& pL : mLightVector) {
         pL.SetIntensity(lightIntensity);
     }
+
+    mSkullPosition = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+    mSkullLookDirection = DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
 }
 
 void Renderer::Init()
@@ -188,6 +182,12 @@ void Renderer::Init()
         OutputDebugStringA(err.c_str());
         assert(false);
         exit(1);
+    }
+
+    for (size_t i = 0; i < shapes.size(); i++)
+    {
+        // so we know what mesh instances need to be moved when keyboard keys are pressed
+        mSkullInstances.push_back(i);
     }
 
     // Create position vertex staging buffer
@@ -292,21 +292,21 @@ void Renderer::Init()
         mpDeviceContext->CopyResource(mpSceneIndexBuffer.Get(), stagingBuffer.Get());
     }
 
-
     // Create instance buffer
     {
-        UINT totalNumInstances = (UINT)shapes.size();
+        mNumTotalMeshInstances = shapes.size();
 
         D3D11_BUFFER_DESC bufferDesc{};
-        bufferDesc.ByteWidth = sizeof(PerInstanceData) * totalNumInstances;
+        bufferDesc.ByteWidth = (UINT)(sizeof(PerInstanceData) * mNumTotalMeshInstances);
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
         bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-        std::vector<PerInstanceData> initialPerInstanceData(totalNumInstances);
-        for (UINT i = 0; i < totalNumInstances; ++i)
+        // initialize instance data
+        mCPUSceneInstanceBuffer.resize(mNumTotalMeshInstances);
+        for (UINT i = 0; i < mNumTotalMeshInstances; ++i)
         {
-            PerInstanceData& instance = initialPerInstanceData.at(i);
+            PerInstanceData& instance = mCPUSceneInstanceBuffer.at(i);
             // flip so the skull looks away from the moon
             DirectX::XMMATRIX modelWorld = DirectX::XMMatrixScaling(1.0f, 1.0f, -1.0f);
             DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixTranspose(modelWorld));
@@ -314,8 +314,8 @@ void Renderer::Init()
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
-        initialData.pSysMem = initialPerInstanceData.data();
-        initialData.SysMemPitch = totalNumInstances * sizeof(PerInstanceData);
+        initialData.pSysMem = mCPUSceneInstanceBuffer.data();
+        initialData.SysMemPitch = (UINT)(mNumTotalMeshInstances * sizeof(PerInstanceData));
         CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, &initialData, &mpSceneInstanceBuffer));
     }
 
@@ -539,6 +539,41 @@ void Renderer::Resize(int width, int height)
     }
 }
 
+void Renderer::HandleEvent(UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_KEYDOWN:
+        if (wParam == 'W') {
+            mForwardHeld = true;
+        }
+        if (wParam == 'S') {
+            mBackwardHeld = true;
+        }
+        if (wParam == 'A') {
+            mRotateLeftHeld = true;
+        }
+        if (wParam == 'D') {
+            mRotateRightHeld = true;
+        }
+        break;
+    case WM_KEYUP:
+        if (wParam == 'W') {
+            mForwardHeld = false;
+        }
+        if (wParam == 'S') {
+            mBackwardHeld = false;
+        }
+        if (wParam == 'A') {
+            mRotateLeftHeld = false;
+        }
+        if (wParam == 'D') {
+            mRotateRightHeld = false;
+        }
+        break;
+    }
+}
+
 void Renderer::Update(int deltaTime_ms)
 {
     float deltaTime_sec = deltaTime_ms * 0.001f;
@@ -567,6 +602,16 @@ void Renderer::Update(int deltaTime_ms)
 
     mFogCPUParticles.erase(std::remove_if(begin(mFogCPUParticles), end(mFogCPUParticles),
         [](const FogParticleData& part) { return part.Intensity <= 0.0f; }), mFogCPUParticles.end());
+
+
+    // Update skull position/direction
+    {
+        static const float kForwardSpeed = 5.0f;
+        
+        float forwardMovementAmount = (mForwardHeld - mBackwardHeld) * kForwardSpeed;
+        DirectX::XMVECTOR forwardMovement = DirectX::XMVectorScale(mSkullLookDirection, forwardMovementAmount * deltaTime_sec);
+        mSkullPosition = DirectX::XMVectorAdd(mSkullPosition, forwardMovement);
+    }
 }
 
 void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& camera)
@@ -692,6 +737,33 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->PSSetShaderResources(SkyboxPSShaderResourceSlots::SkyboxTextureSRV, 1, mpSkyboxTextureSRV.GetAddressOf());
         mpDeviceContext->PSSetSamplers(SkyboxPSSamplerSlots::SkyboxSMP, 1, mpSkyboxSampler.GetAddressOf());
         mpDeviceContext->Draw(36, 0);
+    }
+
+    // Update model transforms
+    {
+        // update skull transforms
+        for (size_t skullMeshInstanceID : mSkullInstances)
+        {
+            DirectX::XMMATRIX transform = DirectX::XMMatrixTranslationFromVector(mSkullPosition);
+            DirectX::XMStoreFloat4x4(&mCPUSceneInstanceBuffer[skullMeshInstanceID].ModelWorld, transform);
+        }
+
+        // copy instance data
+        {
+            D3D11_MAPPED_SUBRESOURCE mappedInstances;
+            CHECK_HR(mpDeviceContext->Map(mpSceneInstanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedInstances));
+
+            PerInstanceData* pInstances = (PerInstanceData*)mappedInstances.pData;
+
+            for (size_t i = 0; i < mCPUSceneInstanceBuffer.size(); i++)
+            {
+                DirectX::XMMATRIX transform = DirectX::XMLoadFloat4x4(&mCPUSceneInstanceBuffer[i].ModelWorld);
+                DirectX::XMStoreFloat4x4(&pInstances[i].ModelWorld, DirectX::XMMatrixTranspose(transform));
+                pInstances[i].materialID = mCPUSceneInstanceBuffer[i].materialID;
+            }
+
+            mpDeviceContext->Unmap(mpSceneInstanceBuffer.Get(), 0);
+        }
     }
 
     // Draw models

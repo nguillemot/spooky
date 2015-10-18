@@ -19,6 +19,13 @@ class Renderer
         float Ns;
     };
 
+    __declspec(align(16))
+    struct PerInstanceData
+    {
+        DirectX::XMFLOAT4X4 ModelWorld;
+        UINT materialID;
+    };
+
     struct FogParticleData
     {
         DirectX::XMFLOAT3 WorldPosition;
@@ -32,7 +39,11 @@ class Renderer
     ComPtr<ID3D11Buffer> mpScenePositionNormalBuffer;
     ComPtr<ID3D11Buffer> mpSceneIndexBuffer;
     ComPtr<ID3D11Buffer> mpSceneInstanceBuffer;
+    std::vector<PerInstanceData> mCPUSceneInstanceBuffer;
+    size_t mNumTotalMeshInstances;
     std::vector<D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS> mSceneDrawArgs;
+    
+    std::vector<size_t> mSkullInstances;
 
     ComPtr<ID3D11Buffer> mpCameraBuffer;
     ComPtr<ID3D11Buffer> mpLightBuffer;
@@ -84,10 +95,18 @@ class Renderer
 
     std::mt19937 mFogRNG;
     std::normal_distribution<float> mFogDistribution;
-    int mTotalFogParticlesMade;
+    size_t mTotalFogParticlesMade;
 
     int mClientWidth;
     int mClientHeight;
+
+    bool mForwardHeld;
+    bool mBackwardHeld;
+    bool mRotateLeftHeld;
+    bool mRotateRightHeld;
+
+    DirectX::XMVECTOR mSkullPosition;
+    DirectX::XMVECTOR mSkullLookDirection;
 
 public:
     Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext);
@@ -95,6 +114,8 @@ public:
     void Init();
 
     void Resize(int width, int height);
+
+    void HandleEvent(UINT message, WPARAM wParam, LPARAM lParam);
 
     void Update(int deltaTime_ms);
 
