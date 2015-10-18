@@ -16,6 +16,7 @@ namespace SceneBufferBindings
     enum
     {
         PositionOnlyBuffer,
+		NormalBuffer,
         PerInstanceBuffer,
         Count
     };
@@ -61,10 +62,20 @@ namespace SkyboxPSSamplerSlots
     };
 }
 
+struct Material
+{
+	DirectX::XMFLOAT3 AmbientColor;
+	DirectX::XMFLOAT3 SpecularColor;
+	DirectX::XMFLOAT3 DiffuseColor;
+	float Ns;
+};
+
 struct PerInstanceData
 {
     DirectX::XMFLOAT4X4 ModelWorld;
+	Material InstanceMaterial;
 };
+
 
 __declspec(align(16))
 struct CameraData
@@ -217,6 +228,13 @@ void Renderer::LoadScene()
         for (PerInstanceData& instance : initialPerInstanceData)
         {
             DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixIdentity());
+			DirectX::XMFLOAT3 ambient(materials[0].ambient[0], materials[0].ambient[1], materials[0].ambient[2]);
+			DirectX::XMFLOAT3 specular(materials[0].specular[0], materials[0].specular[1], materials[0].specular[2]);
+			DirectX::XMFLOAT3 diffuse(materials[0].diffuse[0], materials[0].diffuse[1], materials[0].diffuse[2]);
+			instance.InstanceMaterial.Ns = materials[0].shininess;
+			instance.InstanceMaterial.AmbientColor = ambient;
+			instance.InstanceMaterial.DiffuseColor = diffuse;
+			instance.InstanceMaterial.SpecularColor = specular;
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
@@ -249,7 +267,7 @@ void Renderer::LoadScene()
 
         D3D11_INPUT_ELEMENT_DESC inputElementDescs[] = {
             { "POSITION",   0, DXGI_FORMAT_R32G32B32_FLOAT,    SceneBufferBindings::PositionOnlyBuffer, 0,  D3D11_INPUT_PER_VERTEX_DATA,   0 },
-            { "NORMAL",     0, DXGI_FORMAT_R32G32B32_FLOAT,    SceneBufferBindings::PositionOnlyBuffer, 0,  D3D11_INPUT_PER_VERTEX_DATA,   0 },
+            { "NORMAL",     0, DXGI_FORMAT_R32G32B32_FLOAT,    SceneBufferBindings::NormalBuffer,	    0,  D3D11_INPUT_PER_VERTEX_DATA,   0 },
             { "MODELWORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  0,  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
             { "MODELWORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  16, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
             { "MODELWORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  32, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
@@ -352,7 +370,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
         static float x = 0.0f;
         x += 0.01f;
-        DirectX::XMVECTOR eye = DirectX::XMVectorSet(-15.0f * cos(x), -10.0f, -15.0f * sin(x), 1.0f);
+        DirectX::XMVECTOR eye = DirectX::XMVectorSet(-20.0f * cos(x), 6.0f, -20.0f * sin(x), 1.0f);
         DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 3.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         DirectX::XMMATRIX worldView = DirectX::XMMatrixLookAtLH(eye, center, up);
@@ -373,10 +391,10 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         LightData* pLight = (LightData*)mappedLight.pData;
 
         DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
-        DirectX::XMFLOAT4 lightPosition(0.f, 10.f, 0.f, 1.f);
+        DirectX::XMFLOAT4 lightPosition(0.f, 10.f, 3.f, 1.f);
         static float x = 0.0f;
         x += 0.01f;
-        float lightIntensity = (sin(x) + 1.f) * (sin(x) / 2) + 0.5f;
+        float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + (1.f/3.f);
 
         pLight->LightColor = lightColor;
         pLight->LightPosition = lightPosition;
@@ -418,6 +436,9 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
     pSceneVertexBuffers[SceneBufferBindings::PositionOnlyBuffer] = mpScenePositionVertexBuffer.Get();
     sceneStrides[SceneBufferBindings::PositionOnlyBuffer] = sizeof(float) * 3;
+
+	pSceneVertexBuffers[SceneBufferBindings::NormalBuffer] = mpScenePositionNormalBuffer.Get();
+	sceneStrides[SceneBufferBindings::NormalBuffer] = sizeof(float) * 3;
 
     pSceneVertexBuffers[SceneBufferBindings::PerInstanceBuffer] = mpSceneInstanceBuffer.Get();
     sceneStrides[SceneBufferBindings::PerInstanceBuffer] = sizeof(PerInstanceData);

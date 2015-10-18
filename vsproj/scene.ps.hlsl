@@ -5,6 +5,13 @@ cbuffer LightCBV : register(b0)
 	float  LightIntensity;
 };
 
+struct Material
+{
+	float4 Ka;
+	float4 Kd;
+	float4 Ks;
+};
+
 struct PS_INPUT
 {
     float4 Position		 : SV_Position;
@@ -16,6 +23,18 @@ struct PS_OUTPUT
 {
     float4 Color : SV_Target;
 };
+
+/*
+float4 calcPhongLighting(Material M, float4 LColor, float3 N, float3 L, float3 V, float3 R)
+{
+	float4 Ia = M.Ka * 0.1f;
+	float4 Id = M.Kd * saturate(dot(N, L));
+	float4 Is = M.Ks * pow(saturate(dot(R, V)), M.A);
+
+	return Ia + (Id + Is) * LColor;
+}
+*/
+
 
 PS_OUTPUT main(PS_INPUT input)
 {
