@@ -229,7 +229,6 @@ void Renderer::LoadScene()
 			PerInstanceData& instance = initialPerInstanceData.at(i);
             DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixIdentity());
 			//DirectX::XMFLOAT3 ambient = shapes[i].mesh.material_ids;
-			materials[0].
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
