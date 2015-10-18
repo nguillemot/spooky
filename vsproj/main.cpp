@@ -131,7 +131,7 @@ LRESULT CALLBACK MyWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
         float aspect = (float)gRenderWidth / (float)gRenderHeight;
         gCamera.Projection(DirectX::XM_PIDIV2 * 0.8f * 3 / 2, aspect);
         
-        ResizeApp(gRenderWidth, gRenderHeight);
+        ResizeApp(gWindowWidth, gWindowHeight);
 
         return 0;
     }
