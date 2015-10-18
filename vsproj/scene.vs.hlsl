@@ -17,6 +17,7 @@ struct VS_OUTPUT
     float4 Position : SV_Position;
     float3 WorldNormal   : WORLDNORMAL;
     float4 WorldPosition : WORLDPOSITION;
+	float4 WorldEyePosition : WORLDCAMERAPOS;
 };
 
 VS_OUTPUT main(VS_INPUT input)
@@ -25,5 +26,6 @@ VS_OUTPUT main(VS_INPUT input)
     output.Position = mul(mul(input.Position, input.ModelWorld), Camera.WorldViewProjection);
     output.WorldNormal = mul(float4 (input.Normal, 0), input.ModelWorld).xyz;
     output.WorldPosition = mul(input.Position, input.ModelWorld);
+	output.WorldEyePosition = Camera.EyePosition;
     return output;
 }

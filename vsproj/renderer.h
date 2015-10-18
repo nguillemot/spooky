@@ -7,6 +7,7 @@
 
 class Renderer
 {
+	__declspec(align(16))
 	struct Material
 	{
 		DirectX::XMFLOAT3 AmbientColor;

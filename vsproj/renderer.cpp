@@ -288,9 +288,9 @@ void Renderer::LoadScene()
 	{
 		for (int i = 0; i < materials.size(); ++i) {
 			Material mat;
-			DirectX::XMFLOAT3 ambient (materials[i].ambient[0],  materials[i].ambient[1],  materials[i].ambient[2]);
-			DirectX::XMFLOAT3 diffuse (materials[i].diffuse[0],  materials[i].diffuse[1],  materials[i].diffuse[2]);
-			DirectX::XMFLOAT3 specular(materials[i].specular[0], materials[i].specular[1], materials[i].specular[2]);
+			DirectX::XMFLOAT3 ambient (materials[i].ambient[2],  materials[i].ambient[1],  materials[i].ambient[0]);
+			DirectX::XMFLOAT3 diffuse (materials[i].diffuse[2],  materials[i].diffuse[1],  materials[i].diffuse[0]);
+			DirectX::XMFLOAT3 specular(materials[i].specular[2], materials[i].specular[1], materials[i].specular[0]);
 			mat.AmbientColor = ambient;
 			mat.DiffuseColor = diffuse;
 			mat.SpecularColor = specular;
@@ -385,7 +385,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
         static float x = 0.0f;
         x += 0.005f;
-        DirectX::XMVECTOR eye = DirectX::XMVectorSet(50.0f * cos(x), 0.0f, 50.0f * sin(x), 1.0f);
+        DirectX::XMVECTOR eye = DirectX::XMVectorSet(10.0f * cos(x), 0.0f, 10.0f * sin(x), 1.0f);
         DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         DirectX::XMMATRIX worldView = DirectX::XMMatrixLookAtLH(eye, center, up);
@@ -407,10 +407,12 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         LightData* pLight = (LightData*)mappedLight.pData;
 
         DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
+		//DirectX::XMFLOAT4 lightColor(1.0f, 1.0f, 1.0f, 1.0f);
         DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 0.f, 1.f);
         static float x = 0.0f;
         x += 0.01f;
         float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + (2.f / 3.f);
+		//float lightIntensity = 0.9f; // constant intensity because of weirdness with the Phong shading right now
 
         pLight->LightColor = lightColor;
         pLight->LightPosition = lightPosition;
@@ -473,7 +475,6 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
     mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
 	mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpLightBuffer.GetAddressOf());
 
-	/*
 	// Do this in each draw - load material buffer with appropriate material data
     {
         D3D11_MAPPED_SUBRESOURCE mappedMaterial;
@@ -481,13 +482,12 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
         Material* pMaterial = (Material*)mappedMaterial.pData;
 
-		Material* mat = &mMaterialVector.at(0);
+		Material* mat = &mMaterialVector.at(1);
 
 		memcpy(pMaterial, mat, sizeof(Material));
 
-        mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
+        mpDeviceContext->Unmap(mpMaterialBuffer.Get(), 0);
     }
-	*/
 	
 
     for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
