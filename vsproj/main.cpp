@@ -4,10 +4,15 @@
 
 #include "dxutil.h"
 #include "renderer.h"
-#include "game.h"
+#include "camera.h"
+
+#include <shellapi.h> // must be after windows.h
+#include <ShellScalingApi.h>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "ninput.lib")
+#pragma comment(lib, "shcore.lib")
 
 // Constants
 static const int kSwapChainBufferCount = 3;
@@ -21,10 +26,15 @@ ComPtr<IDXGISwapChain> gpSwapChain;
 ComPtr<ID3D11Device> gpDevice;
 ComPtr<ID3D11DeviceContext> gpDeviceContext;
 std::unique_ptr<Renderer> gpRenderer;
-std::unique_ptr<Game> gpGame;
+OrbitCamera gCamera;
 UINT64 gPerformanceFrequency;
 UINT64 gLastFrameTicks;
 UINT64 gAccumulatedFrameTicks;
+double gRenderScale;
+int gWindowWidth;
+int gWindowHeight;
+int gRenderWidth;
+int gRenderHeight;
 
 void InitApp()
 {
@@ -36,9 +46,18 @@ void InitApp()
     gAccumulatedFrameTicks = 0;
 
     gpRenderer = std::make_unique<Renderer>(gpDevice.Get(), gpDeviceContext.Get());
-    gpGame = std::make_unique<Game>();
+    gpRenderer->Init();
 
-    gpRenderer->LoadScene();
+
+#define SIM_ORBIT_RADIUS 50.f
+#define SIM_DISC_RADIUS  12.f
+    auto center = DirectX::XMVectorSet(0.0f, 0.4f*SIM_DISC_RADIUS, 0.0f, 0.0f);
+    auto radius = SIM_ORBIT_RADIUS + SIM_DISC_RADIUS + 10.f;
+    auto minRadius = SIM_ORBIT_RADIUS - 3.0f * SIM_DISC_RADIUS;
+    auto maxRadius = SIM_ORBIT_RADIUS + 3.0f * SIM_DISC_RADIUS;
+    auto longAngle = 4.50f;
+    auto latAngle = 1.45f;
+    gCamera.View(center, radius, minRadius, maxRadius, longAngle, latAngle);
 }
 
 void ResizeApp(int width, int height)
@@ -46,10 +65,15 @@ void ResizeApp(int width, int height)
     CHECK_HR(gpSwapChain->ResizeBuffers(kSwapChainBufferCount, width, height, kSwapChainFormat, 0));
 
     gpRenderer->Resize(width, height);
+
+    float aspect = (float)gRenderWidth / gRenderHeight;
+    gCamera.Projection(DirectX::XM_PIDIV2 * 0.8f * 3 / 2, aspect);
 }
 
 void UpdateApp()
 {
+    gCamera.ProcessInertia();
+
     LARGE_INTEGER currFrameTicks;
     CHECK_WIN32(QueryPerformanceCounter(&currFrameTicks));
 
@@ -62,7 +86,7 @@ void UpdateApp()
     
     while (gAccumulatedFrameTicks >= kTicksPerUpdate)
     {
-        gpGame->Update(kMillisecondsPerUpdate);
+        gpRenderer->Update(kMillisecondsPerUpdate);
         gAccumulatedFrameTicks -= kTicksPerUpdate;
     }
 
@@ -80,7 +104,7 @@ void RenderApp()
     ComPtr<ID3D11RenderTargetView> pBackBufferRTV;
     CHECK_HR(gpDevice->CreateRenderTargetView(pBackBuffer.Get(), &rtvDesc, &pBackBufferRTV));
  
-    gpRenderer->RenderFrame(pBackBufferRTV.Get());
+    gpRenderer->RenderFrame(pBackBufferRTV.Get(), gCamera);
 }
 
 // Event handler
@@ -91,17 +115,87 @@ LRESULT CALLBACK MyWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
     case WM_CLOSE:
         gShouldClose = true;
         return 0;
-    case WM_SIZE:
-        ResizeApp(LOWORD(lParam), HIWORD(lParam));
-        return DefWindowProc(hWnd, message, wParam, lParam);
+    case WM_SIZE: {
+        UINT ww = LOWORD(lParam);
+        UINT wh = HIWORD(lParam);
+
+        // Ignore resizing to minimized
+        if (ww == 0 || wh == 0) return 0;
+
+        gWindowWidth = (int)ww;
+        gWindowHeight = (int)wh;
+        gRenderWidth = (UINT)(double(gWindowWidth)  * gRenderScale);
+        gRenderHeight = (UINT)(double(gWindowHeight) * gRenderScale);
+
+        // Update camera projection
+        float aspect = (float)gRenderWidth / (float)gRenderHeight;
+        gCamera.Projection(DirectX::XM_PIDIV2 * 0.8f * 3 / 2, aspect);
+        
+        ResizeApp(gRenderWidth, gRenderHeight);
+
+        return 0;
+    }
+    case WM_MOUSEWHEEL: {
+        auto delta = GET_WHEEL_DELTA_WPARAM(wParam);
+        gCamera.ZoomRadius(-0.07f * delta);
+        return 0;
+    }
+    case WM_POINTERDOWN:
+    case WM_POINTERUPDATE:
+    case WM_POINTERUP: {
+        auto pointerId = GET_POINTERID_WPARAM(wParam);
+        POINTER_INFO pointerInfo;
+        if (GetPointerInfo(pointerId, &pointerInfo)) {
+            if (message == WM_POINTERDOWN) {
+                
+                // Compute pointer position in render units
+                POINT p = pointerInfo.ptPixelLocation;
+                ScreenToClient(hWnd, &p);
+                
+                RECT clientRect;
+                GetClientRect(hWnd, &clientRect);
+                p.x = p.x * gRenderWidth / (clientRect.right - clientRect.left);
+                p.y = p.y * gRenderHeight / (clientRect.bottom - clientRect.top);
+
+                gCamera.AddPointer(pointerId);
+            }
+
+            // Otherwise send it to the camera controls
+            gCamera.ProcessPointerFrames(pointerId, &pointerInfo);
+            if (message == WM_POINTERUP) gCamera.RemovePointer(pointerId);
+        }
+        return 0;
+    }
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
 }
 
+UINT SetupDPI()
+{
+    // Just do system DPI awareness for now for simplicity... scale the 3D content
+    SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE);
+
+    UINT dpiX = 0, dpiY;
+    POINT pt = { 1, 1 };
+    auto hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    if (SUCCEEDED(GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY))) {
+        return dpiX;
+    }
+    else {
+        return 96; // default
+    }
+}
+
 int main()
 {
-    SetProcessDPIAware();
+    UINT dpi = SetupDPI();
+
+    gRenderScale = 96.0 / double(dpi);
+
+    // Scale default window size based on dpi
+    gWindowWidth *= dpi / 96;
+    gWindowHeight *= dpi / 96;
 
     // Create window
     {

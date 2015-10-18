@@ -35,7 +35,7 @@ namespace ScenePSConstantBufferSlots
     enum
     {
         LightCBV,
-		MaterialCBV
+        MaterialCBV
     };
 }
 
@@ -91,7 +91,7 @@ Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
     , mpDeviceContext(pDeviceContext)
 { }
 
-void Renderer::LoadScene()
+void Renderer::Init()
 {
     std::string inputfile = "Models/skull.obj";
     std::vector<tinyobj::shape_t> shapes;
@@ -273,31 +273,31 @@ void Renderer::LoadScene()
         CHECK_HR(mpDevice->CreateDepthStencilState(&depthStencilDesc, &mpSceneDepthStencilState));
     }
 
-	// Create material data
-	{
-		D3D11_BUFFER_DESC bufferDesc{};
-		bufferDesc.ByteWidth = sizeof(Material);
-		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    // Create material data
+    {
+        D3D11_BUFFER_DESC bufferDesc{};
+        bufferDesc.ByteWidth = sizeof(Material);
+        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-		CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpMaterialBuffer));
-	}
+        CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpMaterialBuffer));
+    }
 
-	// Load material data into member vector
-	{
-		for (int i = 0; i < materials.size(); ++i) {
-			Material mat;
-			DirectX::XMFLOAT3 ambient (materials[i].ambient[0],  materials[i].ambient[1],  materials[i].ambient[2]);
-			DirectX::XMFLOAT3 diffuse (materials[i].diffuse[0],  materials[i].diffuse[1],  materials[i].diffuse[2]);
-			DirectX::XMFLOAT3 specular(materials[i].specular[0], materials[i].specular[1], materials[i].specular[2]);
-			mat.AmbientColor = ambient;
-			mat.DiffuseColor = diffuse;
-			mat.SpecularColor = specular;
-			mat.Ns = materials[i].shininess;
-			mMaterialVector.push_back(mat);
-		}
-	}
+    // Load material data into member vector
+    {
+        for (int i = 0; i < materials.size(); ++i) {
+            Material mat;
+            DirectX::XMFLOAT3 ambient(materials[i].ambient[0], materials[i].ambient[1], materials[i].ambient[2]);
+            DirectX::XMFLOAT3 diffuse(materials[i].diffuse[0], materials[i].diffuse[1], materials[i].diffuse[2]);
+            DirectX::XMFLOAT3 specular(materials[i].specular[0], materials[i].specular[1], materials[i].specular[2]);
+            mat.AmbientColor = ambient;
+            mat.DiffuseColor = diffuse;
+            mat.SpecularColor = specular;
+            mat.Ns = materials[i].shininess;
+            mMaterialVector.push_back(mat);
+        }
+    }
 
     // Create camera data
     {
@@ -374,7 +374,12 @@ void Renderer::Resize(int width, int height)
     }
 }
 
-void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
+void Renderer::Update(int deltaTime_ms)
+{
+
+}
+
+void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& camera)
 {
     // Update camera
     {
@@ -385,12 +390,11 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
         static float x = 0.0f;
         x += 0.005f;
-        DirectX::XMVECTOR eye = DirectX::XMVectorSet(50.0f * cos(x), 0.0f, 50.0f * sin(x), 1.0f);
+        DirectX::XMVECTOR eye = camera.Eye();
         DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-        DirectX::XMMATRIX worldView = DirectX::XMMatrixLookAtLH(eye, center, up);
-        DirectX::XMMATRIX viewProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(70.0f), (float)mClientWidth / mClientHeight, 0.01f, 1000.0f);
-        DirectX::XMMATRIX worldViewProjection = worldView * viewProjection;
+        DirectX::XMMATRIX worldView = camera.WorldView();
+        DirectX::XMMATRIX worldViewProjection = camera.ViewProjection();
 
         DirectX::XMStoreFloat4x4(&pCamera->WorldViewProjection, DirectX::XMMatrixTranspose(worldViewProjection));
         DirectX::XMStoreFloat4x4(&pCamera->WorldView, DirectX::XMMatrixTranspose(worldView));
@@ -471,24 +475,24 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
     mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
     mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
-	mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpLightBuffer.GetAddressOf());
+    mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpLightBuffer.GetAddressOf());
 
-	/*
-	// Do this in each draw - load material buffer with appropriate material data
+    /*
+    // Do this in each draw - load material buffer with appropriate material data
     {
         D3D11_MAPPED_SUBRESOURCE mappedMaterial;
         CHECK_HR(mpDeviceContext->Map(mpMaterialBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedMaterial));
 
         Material* pMaterial = (Material*)mappedMaterial.pData;
 
-		Material* mat = &mMaterialVector.at(0);
+        Material* mat = &mMaterialVector.at(0);
 
-		memcpy(pMaterial, mat, sizeof(Material));
+        memcpy(pMaterial, mat, sizeof(Material));
 
         mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
     }
-	*/
-	
+    */
+
 
     for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
     {

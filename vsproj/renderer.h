@@ -1,19 +1,21 @@
 #pragma once
 
 #include "dxutil.h"
+#include "camera.h"
 #include <DirectXMath.h>
 
 #include <vector>
 
 class Renderer
 {
-	struct Material
-	{
-		DirectX::XMFLOAT3 AmbientColor;
-		DirectX::XMFLOAT3 DiffuseColor;
-		DirectX::XMFLOAT3 SpecularColor;
-		float Ns;
-	};
+    __declspec(align(16))
+    struct Material
+    {
+        DirectX::XMFLOAT3 AmbientColor;
+        DirectX::XMFLOAT3 DiffuseColor;
+        DirectX::XMFLOAT3 SpecularColor;
+        float Ns;
+    };
 
     ID3D11Device* mpDevice;
     ID3D11DeviceContext* mpDeviceContext;
@@ -26,9 +28,9 @@ class Renderer
 
     ComPtr<ID3D11Buffer> mpCameraBuffer;
     ComPtr<ID3D11Buffer> mpLightBuffer;
-	ComPtr<ID3D11Buffer> mpMaterialBuffer;
+    ComPtr<ID3D11Buffer> mpMaterialBuffer;
 
-	std::vector<Material> mMaterialVector;
+    std::vector<Material> mMaterialVector;
 
     ComPtr<ID3D11Texture2D> mpSceneDepthBuffer;
     ComPtr<ID3D11DepthStencilView> mpSceneDSV;
@@ -54,7 +56,11 @@ class Renderer
 public:
     Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext);
 
-    void LoadScene();
+    void Init();
+
     void Resize(int width, int height);
-    void RenderFrame(ID3D11RenderTargetView* pRTV);
+
+    void Update(int deltaTime_ms);
+
+    void RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& camera);
 };
