@@ -17,6 +17,12 @@ class Renderer
         float Ns;
     };
 
+    struct FogParticleData
+    {
+        DirectX::XMFLOAT3 WorldPosition;
+        float Intensity;
+    };
+
     ID3D11Device* mpDevice;
     ID3D11DeviceContext* mpDeviceContext;
 
@@ -60,6 +66,18 @@ class Renderer
     ComPtr<ID3D11Resource> mpWaterDepthTexture;
     ComPtr<ID3D11ShaderResourceView> mpWaterDepthTextureSRV;
     ComPtr<ID3D11SamplerState> mpWaterDepthSampler;
+
+    ComPtr<ID3D11VertexShader> mpFogVertexShader;
+    ComPtr<ID3D11GeometryShader> mpFogGeometryShader;
+    ComPtr<ID3D11PixelShader> mpFogPixelShader;
+    ComPtr<ID3D11InputLayout> mpFogInputLayout;
+
+    ComPtr<ID3D11Resource> mpFogTexture;
+    ComPtr<ID3D11ShaderResourceView> mpFogTextureSRV;
+    ComPtr<ID3D11SamplerState> mpFogSampler;
+
+    std::vector<FogParticleData> mFogCPUParticles;
+    ComPtr<ID3D11Buffer> mpFogGPUParticles;
 
     int mClientWidth;
     int mClientHeight;

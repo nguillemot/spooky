@@ -12,7 +12,12 @@
 #include "water.vs.hlsl.h"
 #include "water.ps.hlsl.h"
 
+#include "fog.vs.hlsl.h"
+#include "fog.gs.hlsl.h"
+#include "fog.ps.hlsl.h"
+
 #include <iostream>
+#include <algorithm>
 
 namespace SceneBufferBindings
 {
@@ -98,6 +103,39 @@ namespace WaterPSSamplerSlots
     };
 }
 
+namespace FogBufferBindingSlots
+{
+    enum
+    {
+        PerParticleData,
+        Count
+    };
+}
+
+namespace FogGSConstantBufferSlots
+{
+    enum
+    {
+        CameraCBV
+    };
+}
+
+namespace FogPSShaderResourceSlots
+{
+    enum
+    {
+        FogTextureSRV
+    };
+}
+
+namespace FogPSSamplerSlots
+{
+    enum
+    {
+        FogSMP
+    };
+}
+
 struct PerInstanceData
 {
     DirectX::XMFLOAT4X4 ModelWorld;
@@ -108,6 +146,7 @@ struct CameraData
 {
     DirectX::XMFLOAT4X4 WorldViewProjection;
     DirectX::XMFLOAT4X4 WorldView;
+    DirectX::XMFLOAT4X4 ViewProjection;
     DirectX::XMFLOAT4 EyePosition;
 };
 
@@ -430,6 +469,31 @@ void Renderer::Init()
         CHECK_HR(mpDevice->CreateSamplerState(&waterSamplerDesc, &mpWaterDepthSampler));
     }
 
+    // Fog pipeline state
+    {
+        CHECK_HR(mpDevice->CreateVertexShader(g_fog_vs, sizeof(g_fog_vs), NULL, &mpFogVertexShader));
+        CHECK_HR(mpDevice->CreateGeometryShader(g_fog_gs, sizeof(g_fog_gs), NULL, &mpFogGeometryShader));
+        CHECK_HR(mpDevice->CreatePixelShader(g_fog_ps, sizeof(g_fog_ps), NULL, &mpFogPixelShader));
+
+        D3D11_INPUT_ELEMENT_DESC inputElementDescs[] = {
+            { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT, FogBufferBindingSlots::PerParticleData, offsetof(FogParticleData, WorldPosition),  D3D11_INPUT_PER_VERTEX_DATA,   0 },
+            { "INTENSITY", 0, DXGI_FORMAT_R32_FLOAT,       FogBufferBindingSlots::PerParticleData, offsetof(FogParticleData, Intensity),  D3D11_INPUT_PER_VERTEX_DATA,   0 },
+        };
+
+        CHECK_HR(mpDevice->CreateInputLayout(inputElementDescs, _countof(inputElementDescs), g_fog_vs, sizeof(g_fog_vs), &mpFogInputLayout));
+    }
+
+    // Load fog texture
+    {
+        CHECK_HR(DirectX::CreateDDSTextureFromFileEx(
+            mpDevice, mpDeviceContext,
+            L"Skyboxes/fog.DDS",
+            (size_t)0, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0, true,
+            &mpFogTexture, &mpFogTextureSRV, nullptr));
+
+        D3D11_SAMPLER_DESC fogSamplerDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
+        CHECK_HR(mpDevice->CreateSamplerState(&fogSamplerDesc, &mpFogSampler));
+    }
 }
 
 void Renderer::Resize(int width, int height)
@@ -459,7 +523,28 @@ void Renderer::Resize(int width, int height)
 
 void Renderer::Update(int deltaTime_ms)
 {
-    mTimeSinceStart_sec += deltaTime_ms * 0.001f;
+    float deltaTime_sec = deltaTime_ms * 0.001f;
+    mTimeSinceStart_sec += deltaTime_sec;
+
+    static const float kTimeToDeath = 5.0f;
+
+    mFogCPUParticles.resize(5);
+    for (size_t i = 0; i < mFogCPUParticles.size(); i++)
+    {
+        mFogCPUParticles[i].Intensity = 1.0f;
+        DirectX::XMStoreFloat3(&mFogCPUParticles[i].WorldPosition, DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f));
+    }
+
+    // Update particles
+    for (size_t i = 0; i < mFogCPUParticles.size(); i++)
+    {
+        mFogCPUParticles[i].Intensity -= deltaTime_sec / kTimeToDeath;
+    }
+
+    mFogCPUParticles.erase(std::remove_if(begin(mFogCPUParticles), end(mFogCPUParticles),
+        [](const FogParticleData& part) { 
+        return part.Intensity <= 0.0f; }),
+        mFogCPUParticles.end());
 }
 
 void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& camera)
@@ -476,10 +561,12 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         DirectX::XMMATRIX worldView = camera.WorldView();
-        DirectX::XMMATRIX worldViewProjection = camera.ViewProjection();
+        DirectX::XMMATRIX viewProjection = camera.ViewProjection();
+        DirectX::XMMATRIX worldViewProjection = camera.WorldViewProjection();
 
         DirectX::XMStoreFloat4x4(&pCamera->WorldViewProjection, DirectX::XMMatrixTranspose(worldViewProjection));
         DirectX::XMStoreFloat4x4(&pCamera->WorldView, DirectX::XMMatrixTranspose(worldView));
+        DirectX::XMStoreFloat4x4(&pCamera->ViewProjection, DirectX::XMMatrixTranspose(viewProjection));
         DirectX::XMStoreFloat4(&pCamera->EyePosition, eye);
 
         mpDeviceContext->Unmap(mpCameraBuffer.Get(), 0);
@@ -626,6 +713,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->VSSetShader(mpWaterVertexShader.Get(), NULL, 0);
         mpDeviceContext->PSSetShader(mpWaterPixelShader.Get(), NULL, 0);
         mpDeviceContext->IASetInputLayout(nullptr);
+        mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         mpDeviceContext->RSSetState(nullptr);
         mpDeviceContext->OMSetBlendState(mpWaterBlendState.Get(), NULL, UINT_MAX);
         mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
@@ -634,5 +722,59 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->PSSetShaderResources(WaterPSShaderResourceSlots::WaterDepthSRV, 1, mpWaterDepthTextureSRV.GetAddressOf());
         mpDeviceContext->PSSetSamplers(WaterPSSamplerSlots::WaterDepthSMP, 1, mpWaterDepthSampler.GetAddressOf());
         mpDeviceContext->Draw(6, 0);
+    }
+
+    // Draw fog
+    {
+        // copy fog data in
+        {
+            D3D11_BUFFER_DESC bufferDesc{};
+            if (mpFogGPUParticles) {
+                mpFogGPUParticles->GetDesc(&bufferDesc);
+            }
+
+            if (bufferDesc.ByteWidth < mFogCPUParticles.size() * sizeof(FogParticleData))
+            {
+                bufferDesc.ByteWidth = (UINT)((mFogCPUParticles.size() + 100) * sizeof(FogParticleData));
+                bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+                bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+                bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+                CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpFogGPUParticles));
+            }
+         
+            if (!mFogCPUParticles.empty())
+            {
+                D3D11_MAPPED_SUBRESOURCE mapped;
+                CHECK_HR(mpDeviceContext->Map(mpFogGPUParticles.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped));
+
+                memcpy(mapped.pData, mFogCPUParticles.data(), mFogCPUParticles.size() * sizeof(FogParticleData));
+
+                mpDeviceContext->Unmap(mpFogGPUParticles.Get(), 0);
+            }
+        }
+
+        mpDeviceContext->VSSetShader(mpFogVertexShader.Get(), NULL, 0);
+        mpDeviceContext->GSSetShader(mpFogGeometryShader.Get(), NULL, 0);
+        mpDeviceContext->PSSetShader(mpFogPixelShader.Get(), NULL, 0);
+        mpDeviceContext->IASetInputLayout(mpFogInputLayout.Get());
+        mpDeviceContext->RSSetState(NULL);
+        mpDeviceContext->OMSetBlendState(mpWaterBlendState.Get(), NULL, UINT_MAX);
+        mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
+        mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+        mpDeviceContext->GSSetConstantBuffers(FogGSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
+        mpDeviceContext->PSSetShaderResources(FogPSShaderResourceSlots::FogTextureSRV, 1, mpFogTextureSRV.GetAddressOf());
+        mpDeviceContext->PSSetSamplers(FogPSSamplerSlots::FogSMP, 1, mpFogSampler.GetAddressOf());
+
+        ID3D11Buffer* fogBuffers[FogBufferBindingSlots::Count]{};
+        UINT fogStrides[FogBufferBindingSlots::Count]{};
+        UINT fogOffsets[FogBufferBindingSlots::Count]{};
+
+        fogBuffers[FogBufferBindingSlots::PerParticleData] = mpFogGPUParticles.Get();
+        fogStrides[FogBufferBindingSlots::PerParticleData] = sizeof(FogParticleData);
+        mpDeviceContext->IASetVertexBuffers(FogBufferBindingSlots::PerParticleData, FogBufferBindingSlots::Count, fogBuffers, fogStrides, fogOffsets);
+
+        mpDeviceContext->Draw((UINT)mFogCPUParticles.size(), 0);
+        mpDeviceContext->GSSetShader(NULL, NULL, 0);
     }
 }

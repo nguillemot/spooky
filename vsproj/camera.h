@@ -31,7 +31,8 @@ public:
 
     DirectX::XMVECTOR const& Eye() const { return mEye; }
     DirectX::XMMATRIX const& WorldView() const { return mView; }
-    DirectX::XMMATRIX const& ViewProjection() const { return mViewProjection; }
+    DirectX::XMMATRIX const& ViewProjection() const { return mProjection; };
+    DirectX::XMMATRIX const& WorldViewProjection() const { return mViewProjection; }
 
     void AddPointer(UINT pointerId);
     void ProcessPointerFrames(UINT pointerId, const POINTER_INFO* pointerInfo);
