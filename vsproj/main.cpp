@@ -109,6 +109,8 @@ void RenderApp()
 // Event handler
 LRESULT CALLBACK MyWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    gpRenderer->HandleEvent(message, wParam, lParam);
+
     switch (message)
     {
     case WM_CLOSE:
