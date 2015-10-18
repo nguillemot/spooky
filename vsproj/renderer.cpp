@@ -73,7 +73,7 @@ struct Material
 struct PerInstanceData
 {
     DirectX::XMFLOAT4X4 ModelWorld;
-    Material InstanceMaterial;
+    Material MaterialID;
 };
 
 __declspec(align(16))
@@ -225,9 +225,12 @@ void Renderer::LoadScene()
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
         std::vector<PerInstanceData> initialPerInstanceData(totalNumInstances);
-        for (PerInstanceData& instance : initialPerInstanceData)
+        for (UINT i = 0; i < totalNumInstances; ++i)
         {
+            PerInstanceData& instance = initialPerInstanceData.at(i);
             DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixIdentity());
+            //DirectX::XMFLOAT3 ambient = shapes[i].mesh.material_ids;
+            //materials[0].
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
