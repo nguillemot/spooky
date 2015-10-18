@@ -132,6 +132,7 @@
   <ItemGroup>
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="DDSTextureLoader.cpp" />
+    <ClCompile Include="Lightning.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PointLight.cpp" />
     <ClCompile Include="renderer.cpp" />
@@ -141,6 +142,7 @@
     <ClInclude Include="camera.h" />
     <ClInclude Include="DDSTextureLoader.h" />
     <ClInclude Include="dxutil.h" />
+    <ClInclude Include="Lightning.h" />
     <ClInclude Include="PointLight.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="tiny_obj_loader.h" />

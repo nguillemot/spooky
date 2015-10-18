@@ -4,6 +4,7 @@ cbuffer LightCBV : register(b0)
     float4 LightPosition;
     float4 AmbientLightColor;
     float  LightIntensity;
+	float  LightningIntensity;
 };
 
 cbuffer MaterialCBV : register(b1)
@@ -55,7 +56,7 @@ PS_OUTPUT main(PS_INPUT input) {
     float4 NormalizedWorldPositionToCamera = normalize(input.WorldCameraPosition - input.WorldPosition);
 
     float DistanceFromCamera = length(input.WorldCameraPosition - input.WorldPosition);
-    float3 aColor = (AmbientLightColor.xyz + AmbientColor) * dot(input.WorldNormal.xyz, NormalizedWorldPositionToCamera.xyz) / pow(DistanceFromCamera, 2);
+    float3 aColor = (AmbientLightColor.xyz + AmbientColor) * dot(input.WorldNormal.xyz, NormalizedWorldPositionToCamera.xyz) / pow(DistanceFromCamera, 2) + (float3(1.f, 1.f, 1.f) * LightningIntensity);
 
     float4 LightDirectionToPosition = normalize(LightPosition - input.WorldPosition);
     float LightToWorldPositionDistanceSquared = pow(length(input.WorldPosition - LightPosition), 2);
