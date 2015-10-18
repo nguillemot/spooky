@@ -1,7 +1,5 @@
 #include "renderer.h"
 
-
-
 #include "tiny_obj_loader.h"
 #include "DDSTextureLoader.h"
 
@@ -13,6 +11,8 @@
 
 #include "water.vs.hlsl.h"
 #include "water.ps.hlsl.h"
+
+#include <iostream>
 
 namespace SceneBufferBindings
 {
@@ -116,6 +116,7 @@ struct LightData
 {
     DirectX::XMFLOAT4 LightColor;
     DirectX::XMFLOAT4 LightPosition;
+    DirectX::XMFLOAT4 AmbientLightColor;
     float LightIntensity;
 };
 
@@ -463,6 +464,7 @@ void Renderer::Update(int deltaTime_ms)
 
 void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& camera)
 {
+    static bool DebugOutput = false;
     // Update camera
     {
         D3D11_MAPPED_SUBRESOURCE mappedCamera;
@@ -495,9 +497,23 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         float t = (float)mTimeSinceStart_sec;
         float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
 
+        DirectX::XMFLOAT4 ambColor(0.2f, 0.0f, 1.0f, 1.0f);
+
         pLight->LightColor = lightColor;
         pLight->LightPosition = lightPosition;
         pLight->LightIntensity = lightIntensity;
+        pLight->AmbientLightColor = ambColor;
+
+
+        if (!DebugOutput) {
+            std::cout << "Light Information" << '\n';
+            std::cout << "Position: " << pLight->LightPosition.x << ", " << pLight->LightPosition.y << ", " << pLight->LightPosition.z << '\n';
+            std::cout << "Color: " << pLight->LightColor.x << ", " << pLight->LightColor.y << ", " << pLight->LightColor.z << '\n';
+            std::cout << "Intensity: " << pLight->LightIntensity << '\n';
+            std::cout << "Ambient Color: " << pLight->AmbientLightColor.x << ", " << pLight->AmbientLightColor.y << ", " << pLight->AmbientLightColor.z << '\n';
+        }
+
+
 
         mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
     }
@@ -525,8 +541,19 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
 
         memcpy(pMaterial, mat, sizeof(Material));
 
+        if (!DebugOutput) {
+            std::cout << "Material Information" << '\n';
+            std::cout << "Ambient Color: " << pMaterial->AmbientColor.x << ", " << pMaterial->AmbientColor.y << ", " << pMaterial->AmbientColor.z << '\n';
+            std::cout << "Diffuse Color: " << pMaterial->DiffuseColor.x << ", " << pMaterial->DiffuseColor.y << ", " << pMaterial->DiffuseColor.z << '\n';
+            std::cout << "Specular Color: " << pMaterial->SpecularColor.x << ", " << pMaterial->SpecularColor.y << ", " << pMaterial->SpecularColor.z << '\n';
+            std::cout << "Shininess: " << pMaterial->Ns << '\n';
+
+        }
+
         mpDeviceContext->Unmap(mpMaterialBuffer.Get(), 0);
     }
+
+    DebugOutput = true;
 
     mpDeviceContext->OMSetRenderTargets(1, &pRTV, mpSceneDSV.Get());
 
@@ -608,11 +635,4 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->PSSetSamplers(WaterPSSamplerSlots::WaterDepthSMP, 1, mpWaterDepthSampler.GetAddressOf());
         mpDeviceContext->Draw(6, 0);
     }
-
-    /* Plan for fog:
-    1. Draw a ground (pile of bones like dark souls catacombs?)
-    2. Define a field function for smoke columns coming out of the ground.
-    3. Do a ray tracing at every pixel to accumulate opacity of smoke and set depth to the nearest smoke.
-    4. Do an SSAO pass on the smoke to highlight valleys. (possibly incorporate light into the smoke?)
-    */
 }
