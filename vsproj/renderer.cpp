@@ -367,7 +367,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         DirectX::XMMATRIX worldView = DirectX::XMMatrixLookAtLH(eye, center, up);
-        DirectX::XMMATRIX viewProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(45.0f), (float)mClientHeight / mClientWidth, 0.01f, 1000.0f);
+        DirectX::XMMATRIX viewProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(70.0f), (float)mClientWidth / mClientHeight, 0.01f, 1000.0f);
         DirectX::XMMATRIX worldViewProjection = worldView * viewProjection;
 
         DirectX::XMStoreFloat4x4(&pCamera->WorldViewProjection, DirectX::XMMatrixTranspose(worldViewProjection));

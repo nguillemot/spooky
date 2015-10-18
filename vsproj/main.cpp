@@ -63,7 +63,7 @@ LRESULT CALLBACK MyWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
         return 0;
     case WM_SIZE:
         ResizeApp(LOWORD(lParam), HIWORD(lParam));
-        return 0;
+        return DefWindowProc(hWnd, message, wParam, lParam);
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
