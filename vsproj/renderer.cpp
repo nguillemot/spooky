@@ -137,9 +137,11 @@ namespace FogPSSamplerSlots
     };
 }
 
+__declspec(align(16))
 struct PerInstanceData
 {
     DirectX::XMFLOAT4X4 ModelWorld;
+	UINT materialID;
 };
 
 __declspec(align(16))
@@ -308,6 +310,7 @@ void Renderer::Init()
             // flip so the skull looks away from the moon
             DirectX::XMMATRIX modelWorld = DirectX::XMMatrixScaling(1.0f, 1.0f, -1.0f);
             DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixTranspose(modelWorld));
+			instance.materialID = i;
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
@@ -345,6 +348,7 @@ void Renderer::Init()
             { "MODELWORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  16, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
             { "MODELWORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  32, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
             { "MODELWORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "MATERIALID", 4, DXGI_FORMAT_R32_FLOAT,          SceneBufferBindings::PerInstanceBuffer,  64, D3D11_INPUT_PER_INSTANCE_DATA, 1 }
         };
 
         CHECK_HR(mpDevice->CreateInputLayout(inputElementDescs, _countof(inputElementDescs), g_scene_vs, sizeof(g_scene_vs), &mpSceneInputLayout));
@@ -693,43 +697,46 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->Draw(36, 0);
     }
 
-    ID3D11Buffer* pSceneVertexBuffers[SceneBufferBindings::Count]{};
-    UINT sceneStrides[SceneBufferBindings::Count]{};
-    UINT sceneOffsets[SceneBufferBindings::Count]{};
+	// Draw models
+	{
+		ID3D11Buffer* pSceneVertexBuffers[SceneBufferBindings::Count]{};
+		UINT sceneStrides[SceneBufferBindings::Count]{};
+		UINT sceneOffsets[SceneBufferBindings::Count]{};
 
-    pSceneVertexBuffers[SceneBufferBindings::PositionOnlyBuffer] = mpScenePositionVertexBuffer.Get();
-    sceneStrides[SceneBufferBindings::PositionOnlyBuffer] = sizeof(float) * 3;
+		pSceneVertexBuffers[SceneBufferBindings::PositionOnlyBuffer] = mpScenePositionVertexBuffer.Get();
+		sceneStrides[SceneBufferBindings::PositionOnlyBuffer] = sizeof(float) * 3;
 
-    pSceneVertexBuffers[SceneBufferBindings::NormalBuffer] = mpScenePositionNormalBuffer.Get();
-    sceneStrides[SceneBufferBindings::NormalBuffer] = sizeof(float) * 3;
+		pSceneVertexBuffers[SceneBufferBindings::NormalBuffer] = mpScenePositionNormalBuffer.Get();
+		sceneStrides[SceneBufferBindings::NormalBuffer] = sizeof(float) * 3;
 
-    pSceneVertexBuffers[SceneBufferBindings::PerInstanceBuffer] = mpSceneInstanceBuffer.Get();
-    sceneStrides[SceneBufferBindings::PerInstanceBuffer] = sizeof(PerInstanceData);
+		pSceneVertexBuffers[SceneBufferBindings::PerInstanceBuffer] = mpSceneInstanceBuffer.Get();
+		sceneStrides[SceneBufferBindings::PerInstanceBuffer] = sizeof(PerInstanceData);
 
-    mpDeviceContext->IASetVertexBuffers(0, _countof(pSceneVertexBuffers), pSceneVertexBuffers, sceneStrides, sceneOffsets);
-    mpDeviceContext->IASetIndexBuffer(mpSceneIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-    mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		mpDeviceContext->IASetVertexBuffers(0, _countof(pSceneVertexBuffers), pSceneVertexBuffers, sceneStrides, sceneOffsets);
+		mpDeviceContext->IASetIndexBuffer(mpSceneIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    mpDeviceContext->VSSetShader(mpSceneVertexShader.Get(), NULL, 0);
-    mpDeviceContext->PSSetShader(mpScenePixelShader.Get(), NULL, 0);
-    mpDeviceContext->IASetInputLayout(mpSceneInputLayout.Get());
-    mpDeviceContext->RSSetState(mpSceneRasterizerState.Get());
-    mpDeviceContext->OMSetBlendState(NULL, NULL, UINT_MAX);
-    mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
+		mpDeviceContext->VSSetShader(mpSceneVertexShader.Get(), NULL, 0);
+		mpDeviceContext->PSSetShader(mpScenePixelShader.Get(), NULL, 0);
+		mpDeviceContext->IASetInputLayout(mpSceneInputLayout.Get());
+		mpDeviceContext->RSSetState(mpSceneRasterizerState.Get());
+		mpDeviceContext->OMSetBlendState(NULL, NULL, UINT_MAX);
+		mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
 
-    mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
-    mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
-    mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpMaterialBuffer.GetAddressOf());
+		mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
+		mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
+		mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpMaterialBuffer.GetAddressOf());
 
-    for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
-    {
-        mpDeviceContext->DrawIndexedInstanced(
-            drawArgs.IndexCountPerInstance,
-            drawArgs.InstanceCount,
-            drawArgs.StartIndexLocation,
-            drawArgs.BaseVertexLocation,
-            drawArgs.StartInstanceLocation);
-    }
+		for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
+		{
+			mpDeviceContext->DrawIndexedInstanced(
+				drawArgs.IndexCountPerInstance,
+				drawArgs.InstanceCount,
+				drawArgs.StartIndexLocation,
+				drawArgs.BaseVertexLocation,
+				drawArgs.StartInstanceLocation);
+		}
+	}
 
     // Draw water
     {
