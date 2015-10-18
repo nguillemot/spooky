@@ -528,32 +528,29 @@ void Renderer::Update(int deltaTime_ms)
     float deltaTime_sec = deltaTime_ms * 0.001f;
     mTimeSinceStart_sec += deltaTime_sec;
 
-    static const float kParticleFrequency = 1.0f;
+    static const size_t kMaxParticlesToMake = 1000;
+    static const float kAvgTimeToDeath = 10.0f;
 
-    size_t particlesToMake = (size_t)(mTimeSinceStart_sec * kParticleFrequency) - size_t(mTotalFogParticlesMade);
-    for (size_t i = 0; i < particlesToMake; i++)
+    while (mFogCPUParticles.size() < kMaxParticlesToMake)
     {
         FogParticleData particle{};
-        particle.Intensity = 1.0f;
-        float x = mFogDistribution(mFogRNG) * 10.0f;
+        particle.Intensity = std::max(0.8f, std::abs(mFogDistribution(mFogRNG) + 1));
+        float x = mFogDistribution(mFogRNG) * 25.0f;
         float y = mFogDistribution(mFogRNG);
-        float z = mFogDistribution(mFogRNG) * 10.0f;
+        float z = mFogDistribution(mFogRNG) * 25.0f;
         DirectX::XMStoreFloat3(&particle.WorldPosition, DirectX::XMVectorSet(x, y, z, 1.0f));
         mFogCPUParticles.push_back(particle);
     }
-
-    static const float kTimeToDeath = 5.0f;
-
+    
     // Update particles
     for (size_t i = 0; i < mFogCPUParticles.size(); i++)
     {
-        mFogCPUParticles[i].Intensity -= deltaTime_sec / kTimeToDeath;
+        mFogCPUParticles[i].Intensity -= deltaTime_sec / kAvgTimeToDeath;
+        mFogCPUParticles[i].WorldPosition.y = std::sin(mFogCPUParticles[i].Intensity * 2);
     }
 
     mFogCPUParticles.erase(std::remove_if(begin(mFogCPUParticles), end(mFogCPUParticles),
-        [](const FogParticleData& part) { 
-        return part.Intensity <= 0.0f; }),
-        mFogCPUParticles.end());
+        [](const FogParticleData& part) { return part.Intensity <= 0.0f; }), mFogCPUParticles.end());
 }
 
 void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& camera)
