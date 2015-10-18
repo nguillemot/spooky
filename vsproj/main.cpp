@@ -31,8 +31,8 @@ UINT64 gPerformanceFrequency;
 UINT64 gLastFrameTicks;
 UINT64 gAccumulatedFrameTicks;
 double gRenderScale;
-int gWindowWidth;
-int gWindowHeight;
+int gWindowWidth = 1280;
+int gWindowHeight = 720;
 int gRenderWidth;
 int gRenderHeight;
 
@@ -52,8 +52,8 @@ void InitApp()
 #define SIM_ORBIT_RADIUS 50.f
 #define SIM_DISC_RADIUS  12.f
     auto center = DirectX::XMVectorSet(0.0f, 0.4f*SIM_DISC_RADIUS, 0.0f, 0.0f);
-    auto radius = SIM_ORBIT_RADIUS + SIM_DISC_RADIUS + 10.f;
-    auto minRadius = SIM_ORBIT_RADIUS - 3.0f * SIM_DISC_RADIUS;
+    auto radius = 15.0f;
+    auto minRadius = SIM_ORBIT_RADIUS - 3.25f * SIM_DISC_RADIUS;
     auto maxRadius = SIM_ORBIT_RADIUS + 3.0f * SIM_DISC_RADIUS;
     auto longAngle = 4.50f;
     auto latAngle = 1.45f;
@@ -210,7 +210,7 @@ int main()
         wc.lpszClassName = TEXT("WindowClass");
         CHECK_WIN32(RegisterClassEx(&wc));
 
-        RECT wr = { 0, 0, 640, 480 };
+        RECT wr = { 0, 0, gWindowWidth, gWindowHeight };
         CHECK_WIN32(AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE));
         ghWnd = CHECK_WIN32(CreateWindowEx(
             0, TEXT("WindowClass"),
