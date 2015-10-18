@@ -4,3 +4,8 @@ struct CameraData
     float4x4 WorldView;
     float4 EyePosition;
 };
+
+struct TimeData
+{
+    float TimeSinceStart_sec;
+};
