@@ -120,7 +120,6 @@ void OrbitCamera::ZoomRadiusScale(float delta)
     UpdateData();
 }
 
-
 void OrbitCamera::AddPointer(UINT pointerId)
 {
     AddPointerInteractionContext(mInteractionContext, pointerId);

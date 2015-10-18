@@ -6,6 +6,7 @@
 #include <DirectXMath.h>
 
 #include <vector>
+#include <random>
 
 class Renderer
 {
@@ -16,6 +17,12 @@ class Renderer
         DirectX::XMFLOAT3 DiffuseColor;
         DirectX::XMFLOAT3 SpecularColor;
         float Ns;
+    };
+
+    struct FogParticleData
+    {
+        DirectX::XMFLOAT3 WorldPosition;
+        float Intensity;
     };
 
     ID3D11Device* mpDevice;
@@ -62,6 +69,22 @@ class Renderer
     ComPtr<ID3D11Resource> mpWaterDepthTexture;
     ComPtr<ID3D11ShaderResourceView> mpWaterDepthTextureSRV;
     ComPtr<ID3D11SamplerState> mpWaterDepthSampler;
+
+    ComPtr<ID3D11VertexShader> mpFogVertexShader;
+    ComPtr<ID3D11GeometryShader> mpFogGeometryShader;
+    ComPtr<ID3D11PixelShader> mpFogPixelShader;
+    ComPtr<ID3D11InputLayout> mpFogInputLayout;
+
+    ComPtr<ID3D11Resource> mpFogTexture;
+    ComPtr<ID3D11ShaderResourceView> mpFogTextureSRV;
+    ComPtr<ID3D11SamplerState> mpFogSampler;
+
+    std::vector<FogParticleData> mFogCPUParticles;
+    ComPtr<ID3D11Buffer> mpFogGPUParticles;
+
+    std::mt19937 mFogRNG;
+    std::normal_distribution<float> mFogDistribution;
+    int mTotalFogParticlesMade;
 
     int mClientWidth;
     int mClientHeight;
