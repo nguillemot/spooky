@@ -167,7 +167,8 @@ Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
     }
 
     mSkullPosition = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-    mSkullLookDirection = DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
+
+    mSkullLookDirection = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 }
 
 void Renderer::Init()
@@ -307,9 +308,6 @@ void Renderer::Init()
         for (UINT i = 0; i < mNumTotalMeshInstances; ++i)
         {
             PerInstanceData& instance = mCPUSceneInstanceBuffer.at(i);
-            // flip so the skull looks away from the moon
-            DirectX::XMMATRIX modelWorld = DirectX::XMMatrixScaling(1.0f, 1.0f, -1.0f);
-            DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixTranspose(modelWorld));
             instance.materialID = i;
         }
 
@@ -611,6 +609,12 @@ void Renderer::Update(int deltaTime_ms)
         float forwardMovementAmount = (mForwardHeld - mBackwardHeld) * kForwardSpeed;
         DirectX::XMVECTOR forwardMovement = DirectX::XMVectorScale(mSkullLookDirection, forwardMovementAmount * deltaTime_sec);
         mSkullPosition = DirectX::XMVectorAdd(mSkullPosition, forwardMovement);
+
+        static const float kRotateSpeed = 1.0f;
+
+        float rotationAmount = -(mRotateLeftHeld - mRotateRightHeld) * kRotateSpeed * deltaTime_sec;
+        DirectX::XMVECTOR rotationQuat = DirectX::XMQuaternionRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rotationAmount);
+        mSkullLookDirection = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(mSkullLookDirection, rotationQuat));
     }
 }
 
@@ -744,7 +748,22 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         // update skull transforms
         for (size_t skullMeshInstanceID : mSkullInstances)
         {
-            DirectX::XMMATRIX transform = DirectX::XMMatrixTranslationFromVector(mSkullPosition);
+            DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+            DirectX::XMVECTOR across = DirectX::XMVector3Cross(up, mSkullLookDirection);
+            DirectX::XMMATRIX rotation = DirectX::XMMatrixIdentity();
+            rotation.r[0] = across;
+            rotation.r[1] = up;
+            rotation.r[2] = mSkullLookDirection;
+
+            // skull model slightly off center
+            DirectX::XMMATRIX skullRotationFixup = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), -0.3f);
+
+            DirectX::XMMATRIX translation = DirectX::XMMatrixTranslationFromVector(mSkullPosition);
+            
+            // spooky levitation
+            DirectX::XMMATRIX levitation = DirectX::XMMatrixTranslation(0.0f, std::sinf((float)mTimeSinceStart_sec * 5) * 0.5f, 0.0f);
+
+            DirectX::XMMATRIX transform = skullRotationFixup * rotation * translation * levitation;
             DirectX::XMStoreFloat4x4(&mCPUSceneInstanceBuffer[skullMeshInstanceID].ModelWorld, transform);
         }
 
