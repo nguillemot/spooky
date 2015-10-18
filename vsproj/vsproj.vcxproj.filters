@@ -5,12 +5,14 @@
     <ClCompile Include="tiny_obj_loader.cc" />
     <ClCompile Include="renderer.cpp" />
     <ClCompile Include="DDSTextureLoader.cpp" />
+    <ClCompile Include="game.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tiny_obj_loader.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="dxutil.h" />
     <ClInclude Include="DDSTextureLoader.h" />
+    <ClInclude Include="game.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="skybox.vs.hlsl">

@@ -4,6 +4,7 @@
 
 #include "dxutil.h"
 #include "renderer.h"
+#include "game.h"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -11,6 +12,7 @@
 // Constants
 static const int kSwapChainBufferCount = 3;
 static const DXGI_FORMAT kSwapChainFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+static const int kUpdateFrequency = 60;
 
 // Globals
 HWND ghWnd;
@@ -19,10 +21,22 @@ ComPtr<IDXGISwapChain> gpSwapChain;
 ComPtr<ID3D11Device> gpDevice;
 ComPtr<ID3D11DeviceContext> gpDeviceContext;
 std::unique_ptr<Renderer> gpRenderer;
+std::unique_ptr<Game> gpGame;
+UINT64 gPerformanceFrequency;
+UINT64 gLastFrameTicks;
+UINT64 gAccumulatedFrameTicks;
 
 void InitApp()
 {
+    LARGE_INTEGER performanceFrequency, firstFrameTicks;
+    CHECK_WIN32(QueryPerformanceFrequency(&performanceFrequency));
+    CHECK_WIN32(QueryPerformanceCounter(&firstFrameTicks));
+    gPerformanceFrequency = performanceFrequency.QuadPart;
+    gLastFrameTicks = firstFrameTicks.QuadPart;
+    gAccumulatedFrameTicks = 0;
+
     gpRenderer = std::make_unique<Renderer>(gpDevice.Get(), gpDeviceContext.Get());
+    gpGame = std::make_unique<Game>();
 
     gpRenderer->LoadScene();
 }
@@ -36,7 +50,23 @@ void ResizeApp(int width, int height)
 
 void UpdateApp()
 {
+    LARGE_INTEGER currFrameTicks;
+    CHECK_WIN32(QueryPerformanceCounter(&currFrameTicks));
 
+    UINT64 deltaTicks = currFrameTicks.QuadPart - gLastFrameTicks;
+    gAccumulatedFrameTicks += deltaTicks;
+
+    const UINT64 kMillisecondsPerUpdate = 1000 / kUpdateFrequency;
+    const UINT64 kTicksPerMillisecond = gPerformanceFrequency / 1000;
+    const UINT64 kTicksPerUpdate = kMillisecondsPerUpdate * kTicksPerMillisecond;
+    
+    while (gAccumulatedFrameTicks >= kTicksPerUpdate)
+    {
+        gpGame->Update(kMillisecondsPerUpdate);
+        gAccumulatedFrameTicks -= kTicksPerUpdate;
+    }
+
+    gLastFrameTicks = currFrameTicks.QuadPart;
 }
 
 void RenderApp()
@@ -84,15 +114,15 @@ int main()
         wc.hCursor = LoadCursor(NULL, IDC_ARROW);
         wc.hbrBackground = (HBRUSH)COLOR_BACKGROUND;
         wc.lpszClassName = TEXT("WindowClass");
-        RegisterClassEx(&wc);
+        CHECK_WIN32(RegisterClassEx(&wc));
 
         RECT wr = { 0, 0, 640, 480 };
-        AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
-        ghWnd = CreateWindowEx(
+        CHECK_WIN32(AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE));
+        ghWnd = CHECK_WIN32(CreateWindowEx(
             0, TEXT("WindowClass"),
             TEXT("Spooky"), WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT, CW_USEDEFAULT, wr.right - wr.left, wr.bottom - wr.top,
-            0, 0, GetModuleHandle(NULL), 0);
+            0, 0, GetModuleHandle(NULL), 0));
     }
 
     // Create D3D11 device and swap chain
