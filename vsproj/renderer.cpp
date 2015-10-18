@@ -288,9 +288,9 @@ void Renderer::LoadScene()
 	{
 		for (int i = 0; i < materials.size(); ++i) {
 			Material mat;
-			DirectX::XMFLOAT3 ambient (materials[i].ambient[2],  materials[i].ambient[1],  materials[i].ambient[0]);
-			DirectX::XMFLOAT3 diffuse (materials[i].diffuse[2],  materials[i].diffuse[1],  materials[i].diffuse[0]);
-			DirectX::XMFLOAT3 specular(materials[i].specular[2], materials[i].specular[1], materials[i].specular[0]);
+			DirectX::XMFLOAT3 ambient (materials[i].ambient[0],  materials[i].ambient[1],  materials[i].ambient[2]);
+			DirectX::XMFLOAT3 diffuse (materials[i].diffuse[0],  materials[i].diffuse[1],  materials[i].diffuse[2]);
+			DirectX::XMFLOAT3 specular(materials[i].specular[0], materials[i].specular[1], materials[i].specular[2]);
 			mat.AmbientColor = ambient;
 			mat.DiffuseColor = diffuse;
 			mat.SpecularColor = specular;
@@ -421,6 +421,20 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
     }
 
+	// Do this in each draw - load material buffer with appropriate material data
+	{
+		D3D11_MAPPED_SUBRESOURCE mappedMaterial;
+		CHECK_HR(mpDeviceContext->Map(mpMaterialBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedMaterial));
+
+		Material* pMaterial = (Material*)mappedMaterial.pData;
+
+		Material* mat = &mMaterialVector.at(0);
+
+		memcpy(pMaterial, mat, sizeof(Material));
+
+		mpDeviceContext->Unmap(mpMaterialBuffer.Get(), 0);
+	}
+
     mpDeviceContext->OMSetRenderTargets(1, &pRTV, mpSceneDSV.Get());
 
     float kClearColor[] = { 0.1f, 0.1f, 0.1f, 1.0f };
@@ -473,21 +487,9 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
     mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
     mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
-	mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpLightBuffer.GetAddressOf());
+	mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpMaterialBuffer.GetAddressOf());
 
-	// Do this in each draw - load material buffer with appropriate material data
-    {
-        D3D11_MAPPED_SUBRESOURCE mappedMaterial;
-        CHECK_HR(mpDeviceContext->Map(mpMaterialBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedMaterial));
-
-        Material* pMaterial = (Material*)mappedMaterial.pData;
-
-		Material* mat = &mMaterialVector.at(1);
-
-		memcpy(pMaterial, mat, sizeof(Material));
-
-        mpDeviceContext->Unmap(mpMaterialBuffer.Get(), 0);
-    }
+	
 	
 
     for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
