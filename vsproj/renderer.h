@@ -30,10 +30,6 @@ class Renderer
     ComPtr<ID3D11Buffer> mpLightBuffer;
     ComPtr<ID3D11Buffer> mpMaterialBuffer;
 
-	ComPtr<ID3D11Buffer> mpTimeBuffer;
-
-	double mTimeSinceStart_sec;
-
     std::vector<Material> mMaterialVector;
 
     ComPtr<ID3D11Texture2D> mpSceneDepthBuffer;
