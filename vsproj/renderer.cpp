@@ -16,7 +16,7 @@ namespace SceneBufferBindings
     enum
     {
         PositionOnlyBuffer,
-		NormalBuffer,
+        NormalBuffer,
         PerInstanceBuffer,
         Count
     };
@@ -64,22 +64,23 @@ namespace SkyboxPSSamplerSlots
 
 struct Material
 {
-	DirectX::XMFLOAT3 AmbientColor;
-	DirectX::XMFLOAT3 DiffuseColor;
-	DirectX::XMFLOAT3 SpecularColor;
-	float Ns;
+    DirectX::XMFLOAT3 AmbientColor;
+    DirectX::XMFLOAT3 DiffuseColor;
+    DirectX::XMFLOAT3 SpecularColor;
+    float Ns;
 };
 
 struct PerInstanceData
 {
     DirectX::XMFLOAT4X4 ModelWorld;
-	Material MaterialID;
+    Material MaterialID;
 };
 
 __declspec(align(16))
 struct CameraData
 {
     DirectX::XMFLOAT4X4 WorldViewProjection;
+    DirectX::XMFLOAT4X4 WorldView;
     DirectX::XMFLOAT4 EyePosition;
 };
 
@@ -224,11 +225,12 @@ void Renderer::LoadScene()
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
         std::vector<PerInstanceData> initialPerInstanceData(totalNumInstances);
-		for (UINT i = 0; i < totalNumInstances; ++i) 
+        for (UINT i = 0; i < totalNumInstances; ++i)
         {
-			PerInstanceData& instance = initialPerInstanceData.at(i);
+            PerInstanceData& instance = initialPerInstanceData.at(i);
             DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixIdentity());
-			//DirectX::XMFLOAT3 ambient = shapes[i].mesh.material_ids;
+            //DirectX::XMFLOAT3 ambient = shapes[i].mesh.material_ids;
+            //materials[0].
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
@@ -316,7 +318,7 @@ void Renderer::LoadScene()
         skyboxDepthStencilDesc.DepthEnable = FALSE;
         CHECK_HR(mpDevice->CreateDepthStencilState(&skyboxDepthStencilDesc, &mpSkyboxDepthStencilState));
     }
-    
+
     // Create light data
     {
         D3D11_BUFFER_DESC bufferDesc{};
@@ -373,6 +375,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         DirectX::XMMATRIX worldViewProjection = worldView * viewProjection;
 
         DirectX::XMStoreFloat4x4(&pCamera->WorldViewProjection, DirectX::XMMatrixTranspose(worldViewProjection));
+        DirectX::XMStoreFloat4x4(&pCamera->WorldView, DirectX::XMMatrixTranspose(worldView));
         DirectX::XMStoreFloat4(&pCamera->EyePosition, eye);
 
         mpDeviceContext->Unmap(mpCameraBuffer.Get(), 0);
@@ -389,7 +392,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 0.f, 1.f);
         static float x = 0.0f;
         x += 0.01f;
-        float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + (2.f/3.f);
+        float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + (2.f / 3.f);
 
         pLight->LightColor = lightColor;
         pLight->LightPosition = lightPosition;
@@ -432,8 +435,8 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
     pSceneVertexBuffers[SceneBufferBindings::PositionOnlyBuffer] = mpScenePositionVertexBuffer.Get();
     sceneStrides[SceneBufferBindings::PositionOnlyBuffer] = sizeof(float) * 3;
 
-	pSceneVertexBuffers[SceneBufferBindings::NormalBuffer] = mpScenePositionNormalBuffer.Get();
-	sceneStrides[SceneBufferBindings::NormalBuffer] = sizeof(float) * 3;
+    pSceneVertexBuffers[SceneBufferBindings::NormalBuffer] = mpScenePositionNormalBuffer.Get();
+    sceneStrides[SceneBufferBindings::NormalBuffer] = sizeof(float) * 3;
 
     pSceneVertexBuffers[SceneBufferBindings::PerInstanceBuffer] = mpSceneInstanceBuffer.Get();
     sceneStrides[SceneBufferBindings::PerInstanceBuffer] = sizeof(PerInstanceData);

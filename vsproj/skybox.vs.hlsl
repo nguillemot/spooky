@@ -64,7 +64,7 @@ VS_OUTPUT main(VS_INPUT input)
     VS_OUTPUT output;
     float4 worldCornerDirection = float4(kCorners[kCubeIndices[input.VertexID]], 0.0);
     float4 worldCornerPosition = float4(Camera.EyePosition.xyz + worldCornerDirection.xyz, 1.0);
-    output.Position = mul(worldCornerPosition, Camera.WorldViewProjection);
-    output.CubeMapDirection = worldCornerDirection * 1000;
+    output.Position = mul(worldCornerPosition, Camera.WorldView).xyzz;
+    output.CubeMapDirection = worldCornerDirection;
     return output;
 }
