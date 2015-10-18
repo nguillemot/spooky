@@ -34,7 +34,8 @@ namespace ScenePSConstantBufferSlots
 {
     enum
     {
-        LightCBV
+        LightCBV,
+		MaterialCBV
     };
 }
 
@@ -470,6 +471,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
 
     mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
     mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
+	mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpLightBuffer.GetAddressOf());
 
 	/*
 	// Do this in each draw - load material buffer with appropriate material data
