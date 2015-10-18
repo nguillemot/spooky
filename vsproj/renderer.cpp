@@ -14,6 +14,8 @@
 #include "water.vs.hlsl.h"
 #include "water.ps.hlsl.h"
 
+#include <iostream>
+
 namespace SceneBufferBindings
 {
     enum
@@ -108,7 +110,8 @@ struct LightData
 {
     DirectX::XMFLOAT4 LightColor;
     DirectX::XMFLOAT4 LightPosition;
-    float LightIntensity;
+	DirectX::XMFLOAT4 AmbientLightColor;
+	float LightIntensity;
 };
 
 Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
@@ -432,6 +435,7 @@ void Renderer::Update(int deltaTime_ms)
 
 void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& camera)
 {
+	static bool DebugOutput = false;
     // Update camera
     {
         D3D11_MAPPED_SUBRESOURCE mappedCamera;
@@ -459,15 +463,29 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
 
         LightData* pLight = (LightData*)mappedLight.pData;
 
-        DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
-        DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 0.f, 1.f);
+        DirectX::XMFLOAT4 lightColor(1.0f, 0.6f, 0.2f, 1.0f);
+        DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 5.f, 1.f);
         static float x = 0.0f;
         x += 0.01f;
-        float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + (2.f / 3.f);
+        float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + 1.f;
 
+		DirectX::XMFLOAT4 ambColor(0.2f, 0.0f, 1.0f, 1.0f);
+		
         pLight->LightColor = lightColor;
         pLight->LightPosition = lightPosition;
         pLight->LightIntensity = lightIntensity;
+		pLight->AmbientLightColor = ambColor;
+
+
+		if (!DebugOutput) {
+			std::cout << "Light Information" << '\n';
+			std::cout << "Position: " << pLight->LightPosition.x << ", " << pLight->LightPosition.y << ", " << pLight->LightPosition.z << '\n';
+			std::cout << "Color: " << pLight->LightColor.x << ", " << pLight->LightColor.y << ", " << pLight->LightColor.z << '\n';
+			std::cout << "Intensity: " << pLight->LightIntensity << '\n';
+			std::cout << "Ambient Color: " << pLight->AmbientLightColor.x << ", " << pLight->AmbientLightColor.y << ", " << pLight->AmbientLightColor.z << '\n';
+		}
+
+		
 
         mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
     }
@@ -483,8 +501,19 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
 
         memcpy(pMaterial, mat, sizeof(Material));
 
+		if (!DebugOutput) {
+			std::cout << "Material Information" << '\n';
+			std::cout << "Ambient Color: " << pMaterial->AmbientColor.x << ", " << pMaterial->AmbientColor.y << ", " << pMaterial->AmbientColor.z << '\n';
+			std::cout << "Diffuse Color: " << pMaterial->DiffuseColor.x << ", " << pMaterial->DiffuseColor.y << ", " << pMaterial->DiffuseColor.z << '\n';
+			std::cout << "Specular Color: " << pMaterial->SpecularColor.x << ", " << pMaterial->SpecularColor.y << ", " << pMaterial->SpecularColor.z << '\n';
+			std::cout << "Shininess: " << pMaterial->Ns << '\n';
+
+		}
+
         mpDeviceContext->Unmap(mpMaterialBuffer.Get(), 0);
     }
+
+	DebugOutput = true;
 
     mpDeviceContext->OMSetRenderTargets(1, &pRTV, mpSceneDSV.Get());
 
