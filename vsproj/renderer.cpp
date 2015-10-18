@@ -290,6 +290,7 @@ void Renderer::LoadScene()
             &mpSkyboxTexture, &mpSkyboxTextureSRV, nullptr));
 
         D3D11_SAMPLER_DESC skyboxSamplerDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
+        skyboxSamplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
         CHECK_HR(mpDevice->CreateSamplerState(&skyboxSamplerDesc, &mpSkyboxSampler));
     }
 
@@ -351,9 +352,9 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
         CameraData* pCamera = (CameraData*)mappedCamera.pData;
 
         static float x = 0.0f;
-        x += 0.01f;
-        DirectX::XMVECTOR eye = DirectX::XMVectorSet(-15.0f * cos(x), -10.0f, -15.0f * sin(x), 1.0f);
-        DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 3.0f, 0.0f, 1.0f);
+        x += 0.005f;
+        DirectX::XMVECTOR eye = DirectX::XMVectorSet(50.0f * cos(x), 0.0f, 50.0f * sin(x), 1.0f);
+        DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         DirectX::XMMATRIX worldView = DirectX::XMMatrixLookAtLH(eye, center, up);
         DirectX::XMMATRIX viewProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(45.0f), (float)mClientHeight / mClientWidth, 0.01f, 1000.0f);

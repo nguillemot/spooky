@@ -71,12 +71,14 @@ LRESULT CALLBACK MyWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 
 int main()
 {
+    SetProcessDPIAware();
+
     // Create window
     {
         WNDCLASSEX wc;
         ZeroMemory(&wc, sizeof(wc));
         wc.cbSize = sizeof(wc);
-        wc.style = CS_OWNDC;
+        wc.style = CS_HREDRAW | CS_VREDRAW;
         wc.lpfnWndProc = MyWndProc;
         wc.hInstance = GetModuleHandle(NULL);
         wc.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -85,11 +87,11 @@ int main()
         RegisterClassEx(&wc);
 
         RECT wr = { 0, 0, 640, 480 };
-        AdjustWindowRect(&wr, 0, FALSE);
+        AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
         ghWnd = CreateWindowEx(
             0, TEXT("WindowClass"),
             TEXT("Spooky"), WS_OVERLAPPEDWINDOW,
-            0, 0, wr.right - wr.left, wr.bottom - wr.top,
+            CW_USEDEFAULT, CW_USEDEFAULT, wr.right - wr.left, wr.bottom - wr.top,
             0, 0, GetModuleHandle(NULL), 0);
     }
 
