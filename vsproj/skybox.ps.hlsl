@@ -4,7 +4,7 @@ SamplerState SkyboxSampler : register(s0);
 struct PS_INPUT
 {
     float4 Position : SV_Position;
-    float4 CubeMapDirection : CUBEMAPDIRECTION;
+    float3 CubeMapDirection : CUBEMAPDIRECTION;
 };
 
 struct PS_OUTPUT

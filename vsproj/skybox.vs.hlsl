@@ -13,7 +13,7 @@ struct VS_INPUT
 struct VS_OUTPUT
 {
     float4 Position : SV_Position;
-    float4 CubeMapDirection : CUBEMAPDIRECTION;
+    float3 CubeMapDirection : CUBEMAPDIRECTION;
 };
 
 /*
@@ -65,6 +65,6 @@ VS_OUTPUT main(VS_INPUT input)
     float4 worldCornerDirection = float4(kCorners[kCubeIndices[input.VertexID]], 0.0);
     float4 worldCornerPosition = float4(Camera.EyePosition.xyz + worldCornerDirection.xyz, 1.0);
     output.Position = mul(worldCornerPosition, Camera.WorldView).xyzz;
-    output.CubeMapDirection = worldCornerDirection;
+    output.CubeMapDirection = worldCornerDirection.xyz;
     return output;
 }

@@ -48,7 +48,6 @@ void InitApp()
     gpRenderer = std::make_unique<Renderer>(gpDevice.Get(), gpDeviceContext.Get());
     gpRenderer->Init();
 
-
 #define SIM_ORBIT_RADIUS 50.f
 #define SIM_DISC_RADIUS  12.f
     auto center = DirectX::XMVectorSet(0.0f, 0.4f*SIM_DISC_RADIUS, 0.0f, 0.0f);
@@ -249,6 +248,8 @@ int main()
     InitApp();
 
     ShowWindow(ghWnd, SW_SHOWNORMAL);
+
+    EnableMouseInPointer(TRUE);
 
     while (!gShouldClose)
     {

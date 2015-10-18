@@ -50,6 +50,14 @@ class Renderer
     ComPtr<ID3D11RasterizerState> mpSkyboxRasterizerState;
     ComPtr<ID3D11DepthStencilState> mpSkyboxDepthStencilState;
 
+    ComPtr<ID3D11VertexShader> mpWaterVertexShader;
+    ComPtr<ID3D11PixelShader> mpWaterPixelShader;
+    ComPtr<ID3D11BlendState> mpWaterBlendState;
+
+    ComPtr<ID3D11Resource> mpWaterDepthTexture;
+    ComPtr<ID3D11ShaderResourceView> mpWaterDepthTextureSRV;
+    ComPtr<ID3D11SamplerState> mpWaterDepthSampler;
+
     int mClientWidth;
     int mClientHeight;
 

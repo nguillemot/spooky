@@ -75,7 +75,7 @@ void OrbitCamera::View(
 void OrbitCamera::Projection(float fov, float aspect)
 {
     float fovY = (aspect <= 1.0 ? fov : fov / aspect);
-    mProjection = XMMatrixPerspectiveFovRH(fovY, aspect, 1.f, 100.0f);
+    mProjection = XMMatrixPerspectiveFovLH(fovY, aspect, 1.f, 100.0f);
     UpdateData();
 }
 
@@ -88,7 +88,7 @@ void OrbitCamera::UpdateData()
         mRadius * std::sin(mLatAngle) * std::sin(mLongAngle),
         0.0f);
 
-    mView = XMMatrixLookAtRH(mEye, mCenter, mUp);
+    mView = XMMatrixLookAtLH(mEye, mCenter, mUp);
     mViewProjection = XMMatrixMultiply(mView, mProjection);
 }
 

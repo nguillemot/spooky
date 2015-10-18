@@ -11,6 +11,9 @@
 #include "skybox.vs.hlsl.h"
 #include "skybox.ps.hlsl.h"
 
+#include "water.vs.hlsl.h"
+#include "water.ps.hlsl.h"
+
 namespace SceneBufferBindings
 {
     enum
@@ -63,7 +66,29 @@ namespace SkyboxPSSamplerSlots
     };
 }
 
+namespace WaterVSConstantBufferSlots
+{
+    enum
+    {
+        CameraCBV
+    };
+}
 
+namespace WaterPSShaderResourceSlots
+{
+    enum
+    {
+        WaterDepthSRV
+    };
+}
+
+namespace WaterPSSamplerSlots
+{
+    enum
+    {
+        WaterDepthSMP
+    };
+}
 
 struct PerInstanceData
 {
@@ -250,8 +275,8 @@ void Renderer::Init()
 
     // Create pipeline state
     {
-        CHECK_HR(mpDevice->CreatePixelShader(g_scene_ps, sizeof(g_scene_ps), NULL, &mpScenePixelShader));
         CHECK_HR(mpDevice->CreateVertexShader(g_scene_vs, sizeof(g_scene_vs), NULL, &mpSceneVertexShader));
+        CHECK_HR(mpDevice->CreatePixelShader(g_scene_ps, sizeof(g_scene_ps), NULL, &mpScenePixelShader));
 
         D3D11_INPUT_ELEMENT_DESC inputElementDescs[] = {
             { "POSITION",   0, DXGI_FORMAT_R32G32B32_FLOAT,    SceneBufferBindings::PositionOnlyBuffer, 0,  D3D11_INPUT_PER_VERTEX_DATA,   0 },
@@ -312,9 +337,6 @@ void Renderer::Init()
 
     // Load skybox texture
     {
-        CHECK_HR(mpDevice->CreateVertexShader(g_skybox_vs, sizeof(g_skybox_vs), NULL, &mpSkyboxVertexShader));
-        CHECK_HR(mpDevice->CreatePixelShader(g_skybox_ps, sizeof(g_skybox_ps), NULL, &mpSkyboxPixelShader));
-
         CHECK_HR(DirectX::CreateDDSTextureFromFileEx(
             mpDevice, mpDeviceContext,
             L"Skyboxes/grimmnight.dds",
@@ -328,6 +350,9 @@ void Renderer::Init()
 
     // Create skybox pipeline state
     {
+        CHECK_HR(mpDevice->CreateVertexShader(g_skybox_vs, sizeof(g_skybox_vs), NULL, &mpSkyboxVertexShader));
+        CHECK_HR(mpDevice->CreatePixelShader(g_skybox_ps, sizeof(g_skybox_ps), NULL, &mpSkyboxPixelShader));
+
         D3D11_RASTERIZER_DESC skyboxRasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT());
         skyboxRasterizerDesc.CullMode = D3D11_CULL_NONE;
         CHECK_HR(mpDevice->CreateRasterizerState(&skyboxRasterizerDesc, &mpSkyboxRasterizerState));
@@ -347,6 +372,32 @@ void Renderer::Init()
 
         CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpLightBuffer));
     }
+
+    // Create water pipeline state
+    {
+        CHECK_HR(mpDevice->CreateVertexShader(g_water_vs, sizeof(g_water_vs), NULL, &mpWaterVertexShader));
+        CHECK_HR(mpDevice->CreatePixelShader(g_water_ps, sizeof(g_water_ps), NULL, &mpWaterPixelShader));
+
+        D3D11_BLEND_DESC waterBlendDesc = CD3D11_BLEND_DESC(CD3D11_DEFAULT());
+        waterBlendDesc.RenderTarget[0].BlendEnable = true;
+        waterBlendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+        waterBlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+
+        CHECK_HR(mpDevice->CreateBlendState(&waterBlendDesc, &mpWaterBlendState));
+    }
+
+    // Load water texture
+    {
+        CHECK_HR(DirectX::CreateDDSTextureFromFileEx(
+            mpDevice, mpDeviceContext,
+            L"Skyboxes/water.DDS",
+            (size_t)0, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0, false,
+            &mpWaterDepthTexture, &mpWaterDepthTextureSRV, nullptr));
+
+        D3D11_SAMPLER_DESC waterSamplerDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
+        CHECK_HR(mpDevice->CreateSamplerState(&waterSamplerDesc, &mpWaterDepthSampler));
+    }
+
 }
 
 void Renderer::Resize(int width, int height)
@@ -409,12 +460,10 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         LightData* pLight = (LightData*)mappedLight.pData;
 
         DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
-		//DirectX::XMFLOAT4 lightColor(1.0f, 1.0f, 1.0f, 1.0f);
         DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 0.f, 1.f);
         static float x = 0.0f;
         x += 0.01f;
         float lightIntensity = (sin(x) + 1.f) * (sin(x) / 1.5f) + (2.f / 3.f);
-		//float lightIntensity = 0.9f; // constant intensity because of weirdness with the Phong shading right now
 
         pLight->LightColor = lightColor;
         pLight->LightPosition = lightPosition;
@@ -423,19 +472,19 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
     }
 
-	// Do this in each draw - load material buffer with appropriate material data
-	{
-		D3D11_MAPPED_SUBRESOURCE mappedMaterial;
-		CHECK_HR(mpDeviceContext->Map(mpMaterialBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedMaterial));
+    // Do this in each draw - load material buffer with appropriate material data
+    {
+        D3D11_MAPPED_SUBRESOURCE mappedMaterial;
+        CHECK_HR(mpDeviceContext->Map(mpMaterialBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedMaterial));
 
-		Material* pMaterial = (Material*)mappedMaterial.pData;
+        Material* pMaterial = (Material*)mappedMaterial.pData;
 
-		Material* mat = &mMaterialVector.at(0);
+        Material* mat = &mMaterialVector.at(0);
 
-		memcpy(pMaterial, mat, sizeof(Material));
+        memcpy(pMaterial, mat, sizeof(Material));
 
-		mpDeviceContext->Unmap(mpMaterialBuffer.Get(), 0);
-	}
+        mpDeviceContext->Unmap(mpMaterialBuffer.Get(), 0);
+    }
 
     mpDeviceContext->OMSetRenderTargets(1, &pRTV, mpSceneDSV.Get());
 
@@ -457,6 +506,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->IASetInputLayout(nullptr);
         mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         mpDeviceContext->RSSetState(mpSkyboxRasterizerState.Get());
+        mpDeviceContext->OMSetBlendState(NULL, NULL, UINT_MAX);
         mpDeviceContext->OMSetDepthStencilState(mpSkyboxDepthStencilState.Get(), 0);
         mpDeviceContext->VSSetConstantBuffers(SkyboxVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
         mpDeviceContext->PSSetShaderResources(SkyboxPSShaderResourceSlots::SkyboxTextureSRV, 1, mpSkyboxTextureSRV.GetAddressOf());
@@ -485,6 +535,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
     mpDeviceContext->PSSetShader(mpScenePixelShader.Get(), NULL, 0);
     mpDeviceContext->IASetInputLayout(mpSceneInputLayout.Get());
     mpDeviceContext->RSSetState(mpSceneRasterizerState.Get());
+    mpDeviceContext->OMSetBlendState(NULL, NULL, UINT_MAX);
     mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
 
     mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
@@ -500,4 +551,25 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
             drawArgs.BaseVertexLocation,
             drawArgs.StartInstanceLocation);
     }
+
+    // Draw water
+    {
+        mpDeviceContext->VSSetShader(mpWaterVertexShader.Get(), NULL, 0);
+        mpDeviceContext->PSSetShader(mpWaterPixelShader.Get(), NULL, 0);
+        mpDeviceContext->IASetInputLayout(nullptr);
+        mpDeviceContext->RSSetState(nullptr);
+        mpDeviceContext->OMSetBlendState(mpWaterBlendState.Get(), NULL, UINT_MAX);
+        mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
+        mpDeviceContext->VSSetConstantBuffers(WaterVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
+        mpDeviceContext->PSSetShaderResources(WaterPSShaderResourceSlots::WaterDepthSRV, 1, mpWaterDepthTextureSRV.GetAddressOf());
+        mpDeviceContext->PSSetSamplers(WaterPSSamplerSlots::WaterDepthSMP, 1, mpWaterDepthSampler.GetAddressOf());
+        mpDeviceContext->Draw(6, 0);
+    }
+
+    /* Plan for fog:
+    1. Draw a ground (pile of bones like dark souls catacombs?)
+    2. Define a field function for smoke columns coming out of the ground.
+    3. Do a ray tracing at every pixel to accumulate opacity of smoke and set depth to the nearest smoke.
+    4. Do an SSAO pass on the smoke to highlight valleys. (possibly incorporate light into the smoke?)
+    */
 }
