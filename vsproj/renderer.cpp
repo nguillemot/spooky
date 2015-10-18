@@ -263,7 +263,9 @@ void Renderer::Init()
         for (UINT i = 0; i < totalNumInstances; ++i)
         {
             PerInstanceData& instance = initialPerInstanceData.at(i);
-            DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixIdentity());
+            // flip so the skull looks away from the moon
+            DirectX::XMMATRIX modelWorld = DirectX::XMMatrixScaling(1.0f, 1.0f, -1.0f);
+            DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixTranspose(modelWorld));
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
