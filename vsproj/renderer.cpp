@@ -493,7 +493,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         LightData* pLight = (LightData*)mappedLight.pData;
 
         DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
-        DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 0.f, 1.f);
+        DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 1.f, 1.f);
         float t = (float)mTimeSinceStart_sec;
         float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
 
