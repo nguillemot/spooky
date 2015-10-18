@@ -16,7 +16,7 @@ struct VS_OUTPUT
     float2 TexCoord : TEXCOORD;
 };
 
-static const float kWaterRadius = 20.0;
+static const float kWaterRadius = 50.0;
 static const float kWaterHeight = -3.0;
 
 static const float3 kWorldPositions[] = {
