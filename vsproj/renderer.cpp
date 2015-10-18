@@ -734,6 +734,23 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
 
     // Draw fog
     {
+        // Sort particles from back to front
+        {
+            std::sort(begin(mFogCPUParticles), end(mFogCPUParticles),
+                [&](const FogParticleData& p1, const FogParticleData& p2)
+            {
+                DirectX::XMVECTOR pos1 = DirectX::XMLoadFloat3(&p1.WorldPosition);
+                pos1.m128_f32[3] = 1.0f;
+                DirectX::XMVECTOR pos2 = DirectX::XMLoadFloat3(&p2.WorldPosition);
+                pos2.m128_f32[3] = 1.0f;
+
+                DirectX::XMVECTOR view1 = DirectX::XMVector4Transform(pos1, camera.WorldView());
+                DirectX::XMVECTOR view2 = DirectX::XMVector4Transform(pos2, camera.WorldView());
+
+                return view1.m128_f32[2] > view2.m128_f32[2];
+            });
+        }
+
         // copy fog data in
         {
             D3D11_BUFFER_DESC bufferDesc{};
