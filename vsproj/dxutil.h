@@ -23,3 +23,17 @@ using Microsoft::WRL::ComPtr;
 #else
 #define CHECK_HR(...) __VA_ARGS__
 #endif
+
+#ifdef _DEBUG
+#define CHECK_WIN32(...) \
+    ([&] { \
+        auto x = __VA_ARGS__; \
+        bool ok = !!x; \
+        if (!ok) { \
+            CHECK_HR(HRESULT_FROM_WIN32(GetLastError())); \
+        } \
+        return x; \
+    }())
+#else
+#define CHECK_WIN32(...) __VA_ARGS__
+#endif
