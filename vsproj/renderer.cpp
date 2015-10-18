@@ -471,6 +471,23 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV)
     mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
     mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
 
+	/*
+	// Do this in each draw - load material buffer with appropriate material data
+    {
+        D3D11_MAPPED_SUBRESOURCE mappedMaterial;
+        CHECK_HR(mpDeviceContext->Map(mpMaterialBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedMaterial));
+
+        Material* pMaterial = (Material*)mappedMaterial.pData;
+
+		Material* mat = &mMaterialVector.at(0);
+
+		memcpy(pMaterial, mat, sizeof(Material));
+
+        mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
+    }
+	*/
+	
+
     for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
     {
         mpDeviceContext->DrawIndexedInstanced(
