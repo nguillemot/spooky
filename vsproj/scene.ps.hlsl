@@ -5,11 +5,12 @@ cbuffer LightCBV : register(b0)
 	float  LightIntensity;
 };
 
-struct Material
+cbuffer MaterialCBV : register(b1)
 {
-	float4 Ka;
-	float4 Kd;
-	float4 Ks;
+	float3 AmbientColor;
+	float3 DiffuseColor;
+	float3 SpecularColor;
+	float Ns;
 };
 
 struct PS_INPUT
