@@ -1,11 +1,20 @@
 #pragma once
 
 #include "dxutil.h"
+#include <DirectXMath.h>
 
 #include <vector>
 
 class Renderer
 {
+	struct Material
+	{
+		DirectX::XMFLOAT3 AmbientColor;
+		DirectX::XMFLOAT3 DiffuseColor;
+		DirectX::XMFLOAT3 SpecularColor;
+		float Ns;
+	};
+
     ID3D11Device* mpDevice;
     ID3D11DeviceContext* mpDeviceContext;
 
@@ -17,6 +26,9 @@ class Renderer
 
     ComPtr<ID3D11Buffer> mpCameraBuffer;
     ComPtr<ID3D11Buffer> mpLightBuffer;
+	ComPtr<ID3D11Buffer> mpMaterialBuffer;
+
+	std::vector<Material> mMaterialVector;
 
     ComPtr<ID3D11Texture2D> mpSceneDepthBuffer;
     ComPtr<ID3D11DepthStencilView> mpSceneDSV;

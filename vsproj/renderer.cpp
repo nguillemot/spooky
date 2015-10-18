@@ -1,6 +1,6 @@
 #include "renderer.h"
 
-#include <DirectXMath.h>
+
 
 #include "tiny_obj_loader.h"
 #include "DDSTextureLoader.h"
@@ -62,18 +62,11 @@ namespace SkyboxPSSamplerSlots
     };
 }
 
-struct Material
-{
-    DirectX::XMFLOAT3 AmbientColor;
-    DirectX::XMFLOAT3 DiffuseColor;
-    DirectX::XMFLOAT3 SpecularColor;
-    float Ns;
-};
+
 
 struct PerInstanceData
 {
     DirectX::XMFLOAT4X4 ModelWorld;
-    Material MaterialID;
 };
 
 __declspec(align(16))
@@ -229,8 +222,6 @@ void Renderer::LoadScene()
         {
             PerInstanceData& instance = initialPerInstanceData.at(i);
             DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixIdentity());
-            //DirectX::XMFLOAT3 ambient = shapes[i].mesh.material_ids;
-            //materials[0].
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
@@ -280,6 +271,32 @@ void Renderer::LoadScene()
         D3D11_DEPTH_STENCIL_DESC depthStencilDesc = CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT());
         CHECK_HR(mpDevice->CreateDepthStencilState(&depthStencilDesc, &mpSceneDepthStencilState));
     }
+
+	// Create material data
+	{
+		D3D11_BUFFER_DESC bufferDesc{};
+		bufferDesc.ByteWidth = sizeof(Material);
+		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpMaterialBuffer));
+	}
+
+	// Load material data into member vector
+	{
+		for (int i = 0; i < materials.size(); ++i) {
+			Material mat;
+			DirectX::XMFLOAT3 ambient (materials[i].ambient[0],  materials[i].ambient[1],  materials[i].ambient[2]);
+			DirectX::XMFLOAT3 diffuse (materials[i].diffuse[0],  materials[i].diffuse[1],  materials[i].diffuse[2]);
+			DirectX::XMFLOAT3 specular(materials[i].specular[0], materials[i].specular[1], materials[i].specular[2]);
+			mat.AmbientColor = ambient;
+			mat.DiffuseColor = diffuse;
+			mat.SpecularColor = specular;
+			mat.Ns = materials[i].shininess;
+			mMaterialVector.push_back(mat);
+		}
+	}
 
     // Create camera data
     {
