@@ -2,6 +2,7 @@
 
 #include "dxutil.h"
 #include "camera.h"
+#include "PointLight.h"
 #include <DirectXMath.h>
 
 #include <vector>
@@ -34,6 +35,7 @@ class Renderer
     double mTimeSinceStart_sec;
 
     std::vector<Material> mMaterialVector;
+	std::vector<PointLight> mLightVector;
 
     ComPtr<ID3D11Texture2D> mpSceneDepthBuffer;
     ComPtr<ID3D11DepthStencilView> mpSceneDSV;

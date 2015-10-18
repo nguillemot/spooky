@@ -1,4 +1,5 @@
 #include "renderer.h"
+#include "PointLight.h"
 
 #include "tiny_obj_loader.h"
 #include "DDSTextureLoader.h"
@@ -111,14 +112,7 @@ struct CameraData
     DirectX::XMFLOAT4 EyePosition;
 };
 
-__declspec(align(16))
-struct LightData
-{
-    DirectX::XMFLOAT4 LightColor;
-    DirectX::XMFLOAT4 LightPosition;
-    DirectX::XMFLOAT4 AmbientLightColor;
-    float LightIntensity;
-};
+
 
 __declspec(align(16))
 struct TimeData
@@ -131,6 +125,12 @@ Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
     , mpDeviceContext(pDeviceContext)
 {
     mTimeSinceStart_sec = 0.0;
+
+	float t = (float)mTimeSinceStart_sec;
+	float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
+	for (PointLight& pL : mLightVector) {
+		pL.SetIntensity(lightIntensity);
+	}
 }
 
 void Renderer::Init()
@@ -343,6 +343,18 @@ void Renderer::Init()
         }
     }
 
+	{
+		// Load lights into light buffer. TODO: Add functionality for importing light data from somewhere.
+		PointLight tlight;
+
+		tlight.SetColor(0.7f, 0.4f, 0.1f, 1.0f);
+		tlight.SetPosition(0.f, -10.f, 1.f);
+		tlight.SetIntensity(1.f);
+		tlight.SetAmbientColor(0.2f, 0.0f, 1.0f, 1.0f);
+
+		mLightVector.push_back(tlight);
+	}
+
     // Time buffer
     {
         D3D11_BUFFER_DESC bufferDesc{};
@@ -395,7 +407,7 @@ void Renderer::Init()
     // Create light data
     {
         D3D11_BUFFER_DESC bufferDesc{};
-        bufferDesc.ByteWidth = sizeof(LightData);
+        bufferDesc.ByteWidth = sizeof(LightData) * (UINT) mLightVector.size();
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -485,36 +497,38 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->Unmap(mpCameraBuffer.Get(), 0);
     }
 
-    // Update light
+    // Update lights
     {
         D3D11_MAPPED_SUBRESOURCE mappedLight;
         CHECK_HR(mpDeviceContext->Map(mpLightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedLight));
 
-        LightData* pLight = (LightData*)mappedLight.pData;
+		LightData* pLight = (LightData*)mappedLight.pData;
 
-        DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
-        DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 1.f, 1.f);
-        float t = (float)mTimeSinceStart_sec;
-        float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
+		for (int i = 0; i < mLightVector.size(); ++i) {
 
-        DirectX::XMFLOAT4 ambColor(0.2f, 0.0f, 1.0f, 1.0f);
+			DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
+			DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 1.f, 1.f);
+			float t = (float)mTimeSinceStart_sec;
+			float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
 
-        pLight->LightColor = lightColor;
-        pLight->LightPosition = lightPosition;
-        pLight->LightIntensity = lightIntensity;
-        pLight->AmbientLightColor = ambColor;
+			DirectX::XMFLOAT4 ambColor(0.2f, 0.0f, 1.0f, 1.0f);
 
+			pLight->LightColor = lightColor;
+			pLight->LightPosition = lightPosition;
+			pLight->LightIntensity = lightIntensity;
+			pLight->AmbientLightColor = ambColor;
 
-        if (!DebugOutput) {
-            std::cout << "Light Information" << '\n';
-            std::cout << "Position: " << pLight->LightPosition.x << ", " << pLight->LightPosition.y << ", " << pLight->LightPosition.z << '\n';
-            std::cout << "Color: " << pLight->LightColor.x << ", " << pLight->LightColor.y << ", " << pLight->LightColor.z << '\n';
-            std::cout << "Intensity: " << pLight->LightIntensity << '\n';
-            std::cout << "Ambient Color: " << pLight->AmbientLightColor.x << ", " << pLight->AmbientLightColor.y << ", " << pLight->AmbientLightColor.z << '\n';
-        }
+			pLight += sizeof(LightData);
 
-
-
+			if (!DebugOutput) {
+				std::cout << "Light Information" << '\n';
+				std::cout << "Position: " << pLight->LightPosition.x << ", " << pLight->LightPosition.y << ", " << pLight->LightPosition.z << '\n';
+				std::cout << "Color: " << pLight->LightColor.x << ", " << pLight->LightColor.y << ", " << pLight->LightColor.z << '\n';
+				std::cout << "Intensity: " << pLight->LightIntensity << '\n';
+				std::cout << "Ambient Color: " << pLight->AmbientLightColor.x << ", " << pLight->AmbientLightColor.y << ", " << pLight->AmbientLightColor.z << '\n';
+			}
+		}
+     
         mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
     }
 

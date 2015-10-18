@@ -55,7 +55,7 @@ PS_OUTPUT main(PS_INPUT input) {
     float4 NormalizedWorldPositionToCamera = normalize(input.WorldCameraPosition - input.WorldPosition);
 
     float DistanceFromCamera = length(input.WorldCameraPosition - input.WorldPosition);
-    float3 aColor = (AmbientLightColor.xyz + AmbientColor) /** dot(input.WorldNormal.xyz, NormalizedWorldPositionToCamera.xyz)*/ / pow(DistanceFromCamera, 2);
+    float3 aColor = (AmbientLightColor.xyz + AmbientColor) * dot(input.WorldNormal.xyz, NormalizedWorldPositionToCamera.xyz) / pow(DistanceFromCamera, 2);
 
     float4 LightDirectionToPosition = normalize(LightPosition - input.WorldPosition);
     float LightToWorldPositionDistanceSquared = pow(length(input.WorldPosition - LightPosition), 2);
