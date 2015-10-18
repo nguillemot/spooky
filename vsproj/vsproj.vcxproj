@@ -133,6 +133,7 @@
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="DDSTextureLoader.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="PointLight.cpp" />
     <ClCompile Include="renderer.cpp" />
     <ClCompile Include="tiny_obj_loader.cc" />
   </ItemGroup>
@@ -140,6 +141,7 @@
     <ClInclude Include="camera.h" />
     <ClInclude Include="DDSTextureLoader.h" />
     <ClInclude Include="dxutil.h" />
+    <ClInclude Include="PointLight.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="tiny_obj_loader.h" />
   </ItemGroup>

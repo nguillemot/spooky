@@ -1,4 +1,5 @@
 #include "renderer.h"
+#include "PointLight.h"
 
 #include "tiny_obj_loader.h"
 #include "DDSTextureLoader.h"
@@ -136,9 +137,11 @@ namespace FogPSSamplerSlots
     };
 }
 
+__declspec(align(16))
 struct PerInstanceData
 {
     DirectX::XMFLOAT4X4 ModelWorld;
+    UINT materialID;
 };
 
 __declspec(align(16))
@@ -150,14 +153,7 @@ struct CameraData
     DirectX::XMFLOAT4 EyePosition;
 };
 
-__declspec(align(16))
-struct LightData
-{
-    DirectX::XMFLOAT4 LightColor;
-    DirectX::XMFLOAT4 LightPosition;
-    DirectX::XMFLOAT4 AmbientLightColor;
-    float LightIntensity;
-};
+
 
 __declspec(align(16))
 struct TimeData
@@ -172,6 +168,12 @@ Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
 {
     mTotalFogParticlesMade = 0;
     mTimeSinceStart_sec = 0.0;
+
+    float t = (float)mTimeSinceStart_sec;
+    float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
+    for (PointLight& pL : mLightVector) {
+        pL.SetIntensity(lightIntensity);
+    }
 }
 
 void Renderer::Init()
@@ -308,6 +310,7 @@ void Renderer::Init()
             // flip so the skull looks away from the moon
             DirectX::XMMATRIX modelWorld = DirectX::XMMatrixScaling(1.0f, 1.0f, -1.0f);
             DirectX::XMStoreFloat4x4(&instance.ModelWorld, DirectX::XMMatrixTranspose(modelWorld));
+            instance.materialID = i;
         }
 
         D3D11_SUBRESOURCE_DATA initialData{};
@@ -345,6 +348,7 @@ void Renderer::Init()
             { "MODELWORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  16, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
             { "MODELWORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  32, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
             { "MODELWORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, SceneBufferBindings::PerInstanceBuffer,  48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "MATERIALID", 4, DXGI_FORMAT_R32_FLOAT,          SceneBufferBindings::PerInstanceBuffer,  64, D3D11_INPUT_PER_INSTANCE_DATA, 1 }
         };
 
         CHECK_HR(mpDevice->CreateInputLayout(inputElementDescs, _countof(inputElementDescs), g_scene_vs, sizeof(g_scene_vs), &mpSceneInputLayout));
@@ -382,6 +386,18 @@ void Renderer::Init()
             mat.Ns = materials[i].shininess;
             mMaterialVector.push_back(mat);
         }
+    }
+
+    {
+        // Load lights into light buffer. TODO: Add functionality for importing light data from somewhere.
+        PointLight tlight;
+
+        tlight.SetColor(0.7f, 0.4f, 0.1f, 1.0f);
+        tlight.SetPosition(0.f, -10.f, 1.f);
+        tlight.SetIntensity(1.f);
+        tlight.SetAmbientColor(0.2f, 0.0f, 1.0f, 1.0f);
+
+        mLightVector.push_back(tlight);
     }
 
     // Time buffer
@@ -436,7 +452,7 @@ void Renderer::Init()
     // Create light data
     {
         D3D11_BUFFER_DESC bufferDesc{};
-        bufferDesc.ByteWidth = sizeof(LightData);
+        bufferDesc.ByteWidth = sizeof(LightData) * (UINT)mLightVector.size();
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -541,7 +557,7 @@ void Renderer::Update(int deltaTime_ms)
         DirectX::XMStoreFloat3(&particle.WorldPosition, DirectX::XMVectorSet(x, y, z, 1.0f));
         mFogCPUParticles.push_back(particle);
     }
-    
+
     // Update particles
     for (size_t i = 0; i < mFogCPUParticles.size(); i++)
     {
@@ -578,34 +594,37 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->Unmap(mpCameraBuffer.Get(), 0);
     }
 
-    // Update light
+    // Update lights
     {
         D3D11_MAPPED_SUBRESOURCE mappedLight;
         CHECK_HR(mpDeviceContext->Map(mpLightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedLight));
 
         LightData* pLight = (LightData*)mappedLight.pData;
 
-        DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
-        DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 1.f, 1.f);
-        float t = (float)mTimeSinceStart_sec;
-        float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
+        for (int i = 0; i < mLightVector.size(); ++i) {
 
-        DirectX::XMFLOAT4 ambColor(0.2f, 0.0f, 1.0f, 1.0f);
+            DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
+            DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 1.f, 1.f);
+            float t = (float)mTimeSinceStart_sec;
+            float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
 
-        pLight->LightColor = lightColor;
-        pLight->LightPosition = lightPosition;
-        pLight->LightIntensity = lightIntensity;
-        pLight->AmbientLightColor = ambColor;
+            DirectX::XMFLOAT4 ambColor(0.2f, 0.0f, 1.0f, 1.0f);
 
-        if (!DebugOutput) {
-            std::cout << "Light Information" << '\n';
-            std::cout << "Position: " << pLight->LightPosition.x << ", " << pLight->LightPosition.y << ", " << pLight->LightPosition.z << '\n';
-            std::cout << "Color: " << pLight->LightColor.x << ", " << pLight->LightColor.y << ", " << pLight->LightColor.z << '\n';
-            std::cout << "Intensity: " << pLight->LightIntensity << '\n';
-            std::cout << "Ambient Color: " << pLight->AmbientLightColor.x << ", " << pLight->AmbientLightColor.y << ", " << pLight->AmbientLightColor.z << '\n';
+            pLight->LightColor = lightColor;
+            pLight->LightPosition = lightPosition;
+            pLight->LightIntensity = lightIntensity;
+            pLight->AmbientLightColor = ambColor;
+
+            pLight += sizeof(LightData);
+
+            if (!DebugOutput) {
+                std::cout << "Light Information" << '\n';
+                std::cout << "Position: " << pLight->LightPosition.x << ", " << pLight->LightPosition.y << ", " << pLight->LightPosition.z << '\n';
+                std::cout << "Color: " << pLight->LightColor.x << ", " << pLight->LightColor.y << ", " << pLight->LightColor.z << '\n';
+                std::cout << "Intensity: " << pLight->LightIntensity << '\n';
+                std::cout << "Ambient Color: " << pLight->AmbientLightColor.x << ", " << pLight->AmbientLightColor.y << ", " << pLight->AmbientLightColor.z << '\n';
+            }
         }
-
-
 
         mpDeviceContext->Unmap(mpLightBuffer.Get(), 0);
     }
@@ -675,42 +694,45 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->Draw(36, 0);
     }
 
-    ID3D11Buffer* pSceneVertexBuffers[SceneBufferBindings::Count]{};
-    UINT sceneStrides[SceneBufferBindings::Count]{};
-    UINT sceneOffsets[SceneBufferBindings::Count]{};
-
-    pSceneVertexBuffers[SceneBufferBindings::PositionOnlyBuffer] = mpScenePositionVertexBuffer.Get();
-    sceneStrides[SceneBufferBindings::PositionOnlyBuffer] = sizeof(float) * 3;
-
-    pSceneVertexBuffers[SceneBufferBindings::NormalBuffer] = mpScenePositionNormalBuffer.Get();
-    sceneStrides[SceneBufferBindings::NormalBuffer] = sizeof(float) * 3;
-
-    pSceneVertexBuffers[SceneBufferBindings::PerInstanceBuffer] = mpSceneInstanceBuffer.Get();
-    sceneStrides[SceneBufferBindings::PerInstanceBuffer] = sizeof(PerInstanceData);
-
-    mpDeviceContext->IASetVertexBuffers(0, _countof(pSceneVertexBuffers), pSceneVertexBuffers, sceneStrides, sceneOffsets);
-    mpDeviceContext->IASetIndexBuffer(mpSceneIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-    mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    mpDeviceContext->VSSetShader(mpSceneVertexShader.Get(), NULL, 0);
-    mpDeviceContext->PSSetShader(mpScenePixelShader.Get(), NULL, 0);
-    mpDeviceContext->IASetInputLayout(mpSceneInputLayout.Get());
-    mpDeviceContext->RSSetState(mpSceneRasterizerState.Get());
-    mpDeviceContext->OMSetBlendState(NULL, NULL, UINT_MAX);
-    mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
-
-    mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
-    mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
-    mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpMaterialBuffer.GetAddressOf());
-
-    for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
+    // Draw models
     {
-        mpDeviceContext->DrawIndexedInstanced(
-            drawArgs.IndexCountPerInstance,
-            drawArgs.InstanceCount,
-            drawArgs.StartIndexLocation,
-            drawArgs.BaseVertexLocation,
-            drawArgs.StartInstanceLocation);
+        ID3D11Buffer* pSceneVertexBuffers[SceneBufferBindings::Count]{};
+        UINT sceneStrides[SceneBufferBindings::Count]{};
+        UINT sceneOffsets[SceneBufferBindings::Count]{};
+
+        pSceneVertexBuffers[SceneBufferBindings::PositionOnlyBuffer] = mpScenePositionVertexBuffer.Get();
+        sceneStrides[SceneBufferBindings::PositionOnlyBuffer] = sizeof(float) * 3;
+
+        pSceneVertexBuffers[SceneBufferBindings::NormalBuffer] = mpScenePositionNormalBuffer.Get();
+        sceneStrides[SceneBufferBindings::NormalBuffer] = sizeof(float) * 3;
+
+        pSceneVertexBuffers[SceneBufferBindings::PerInstanceBuffer] = mpSceneInstanceBuffer.Get();
+        sceneStrides[SceneBufferBindings::PerInstanceBuffer] = sizeof(PerInstanceData);
+
+        mpDeviceContext->IASetVertexBuffers(0, _countof(pSceneVertexBuffers), pSceneVertexBuffers, sceneStrides, sceneOffsets);
+        mpDeviceContext->IASetIndexBuffer(mpSceneIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+        mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        mpDeviceContext->VSSetShader(mpSceneVertexShader.Get(), NULL, 0);
+        mpDeviceContext->PSSetShader(mpScenePixelShader.Get(), NULL, 0);
+        mpDeviceContext->IASetInputLayout(mpSceneInputLayout.Get());
+        mpDeviceContext->RSSetState(mpSceneRasterizerState.Get());
+        mpDeviceContext->OMSetBlendState(NULL, NULL, UINT_MAX);
+        mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
+
+        mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
+        mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
+        mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpMaterialBuffer.GetAddressOf());
+
+        for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
+        {
+            mpDeviceContext->DrawIndexedInstanced(
+                drawArgs.IndexCountPerInstance,
+                drawArgs.InstanceCount,
+                drawArgs.StartIndexLocation,
+                drawArgs.BaseVertexLocation,
+                drawArgs.StartInstanceLocation);
+        }
     }
 
     // Draw water
@@ -764,7 +786,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
 
                 CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpFogGPUParticles));
             }
-         
+
             if (!mFogCPUParticles.empty())
             {
                 D3D11_MAPPED_SUBRESOURCE mapped;
