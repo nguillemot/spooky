@@ -8,6 +8,15 @@ cbuffer TimeCBV : register(b0)
     TimeData Time;
 }
 
+cbuffer LightningCBV : register(b1)
+{
+	float4 LightColor;
+	float4 LightPosition;
+	float4 AmbientLightColor;
+	float  LightIntensity;
+	float  LightningIntensity;
+}
+
 struct PS_INPUT
 {
     float4 Position : SV_Position;
@@ -34,7 +43,7 @@ PS_OUTPUT main(PS_INPUT input)
     if (landAffinity < 0.7)
     {
         float3 waterColor = lerp(kDepthColor, kShallowColor, waterDepth);
-        waterColor += float3(0.0, 0.01, 0.01) * sin(Time.TimeSinceStart_sec);
+        waterColor += float3(0.0, 0.01, 0.01) * sin(Time.TimeSinceStart_sec) + (float3(1.f, 1.f, 1.f) * LightningIntensity);
         output.Color = float4(waterColor, pow((1.0 - waterDepth), 2));
     }
     else
