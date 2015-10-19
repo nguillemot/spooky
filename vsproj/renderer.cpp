@@ -61,7 +61,15 @@ namespace SkyboxPSShaderResourceSlots
 {
     enum
     {
-        SkyboxTextureSRV
+        SkyboxTextureSRV,
+    };
+}
+
+namespace SkyboxPSConstantBufferSlots
+{
+	enum
+	{
+		SkyboxLightCBV
     };
 }
 
@@ -527,7 +535,7 @@ void Renderer::Init()
             L"Skyboxes/apple.DDS",
             (size_t)0, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0, true,
             &mpCollectableTexture, &mpCollectableTextureSRV, nullptr));
-    }
+}
 }
 
 void Renderer::Resize(int width, int height)
@@ -650,7 +658,7 @@ void Renderer::Update(int deltaTime_ms)
         static const float kForwardSpeed = 20.0f;
         static const float kForwardAccl = 1.0f;
         static const float kTimeToStop = 0.5f;
-
+        
         float forwardAccelerationAmount = (mForwardHeld - mBackwardHeld) * kForwardAccl;
         mSkullSpeed += forwardAccelerationAmount;
 
@@ -827,6 +835,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->OMSetDepthStencilState(mpSkyboxDepthStencilState.Get(), 0);
         mpDeviceContext->VSSetConstantBuffers(SkyboxVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
         mpDeviceContext->PSSetShaderResources(SkyboxPSShaderResourceSlots::SkyboxTextureSRV, 1, mpSkyboxTextureSRV.GetAddressOf());
+		mpDeviceContext->PSSetConstantBuffers(SkyboxPSConstantBufferSlots::SkyboxLightCBV, 1, mpLightBuffer.GetAddressOf());
         mpDeviceContext->PSSetSamplers(SkyboxPSSamplerSlots::SkyboxSMP, 1, mpSkyboxSampler.GetAddressOf());
         mpDeviceContext->Draw(36, 0);
     }
@@ -954,7 +963,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
             cpuParticles.push_back(plus);
         }
         for (size_t i = 0; i < mCollectableCPUParticles.size(); i++)
-        {
+    {
             FogParticleDataPlus plus;
             plus.WorldPosition = mCollectableCPUParticles[i].WorldPosition;
             plus.Intensity = mCollectableCPUParticles[i].Intensity;
