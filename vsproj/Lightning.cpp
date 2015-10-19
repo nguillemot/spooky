@@ -35,7 +35,7 @@ void Lightning::doFlash(int deltaTime_ms)
 		delay -= deltaTime_ms / 1000.f;
 		if (delay <= 0.f) {
 			delay = 0.f;
-			intensity = .6f;
+			intensity = .5f;
 		}
 	}
 	else {

@@ -60,8 +60,16 @@ namespace SkyboxPSShaderResourceSlots
 {
     enum
     {
-        SkyboxTextureSRV
+        SkyboxTextureSRV,
     };
+}
+
+namespace SkyboxPSConstantBufferSlots
+{
+	enum
+	{
+		SkyboxLightCBV
+	};
 }
 
 namespace SkyboxPSSamplerSlots
@@ -771,6 +779,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->OMSetDepthStencilState(mpSkyboxDepthStencilState.Get(), 0);
         mpDeviceContext->VSSetConstantBuffers(SkyboxVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
         mpDeviceContext->PSSetShaderResources(SkyboxPSShaderResourceSlots::SkyboxTextureSRV, 1, mpSkyboxTextureSRV.GetAddressOf());
+		mpDeviceContext->PSSetConstantBuffers(SkyboxPSConstantBufferSlots::SkyboxLightCBV, 1, mpLightBuffer.GetAddressOf());
         mpDeviceContext->PSSetSamplers(SkyboxPSSamplerSlots::SkyboxSMP, 1, mpSkyboxSampler.GetAddressOf());
         mpDeviceContext->Draw(36, 0);
     }
