@@ -45,6 +45,7 @@ class Renderer
     std::vector<D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS> mSceneDrawArgs;
     
     std::vector<size_t> mSkullInstances;
+    std::vector<size_t> mSkullJawInstances;
 
     ComPtr<ID3D11Buffer> mpCameraBuffer;
     ComPtr<ID3D11Buffer> mpLightBuffer;

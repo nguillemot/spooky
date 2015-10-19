@@ -69,7 +69,7 @@ namespace SkyboxPSConstantBufferSlots
 	enum
 	{
 		SkyboxLightCBV
-	};
+    };
 }
 
 namespace SkyboxPSSamplerSlots
@@ -198,6 +198,11 @@ void Renderer::Init()
     {
         // so we know what mesh instances need to be moved when keyboard keys are pressed
         mSkullInstances.push_back(i);
+
+        if (shapes[i].name == "jaw" || shapes[i].name == "lteeth")
+        {
+            mSkullJawInstances.push_back(i);
+    }
     }
 
     // Create position vertex staging buffer
@@ -803,6 +808,12 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
             
             // spooky levitation
             DirectX::XMMATRIX levitation = DirectX::XMMatrixTranslation(0.0f, std::sinf((float)mTimeSinceStart_sec * 5) * 0.5f, 0.0f);
+
+            // extra spooky levitation
+            if (std::find(begin(mSkullJawInstances), end(mSkullJawInstances), skullMeshInstanceID) != end(mSkullJawInstances))
+            {
+                levitation = levitation * DirectX::XMMatrixTranslation(0.0f, std::abs(std::sin((float)mTimeSinceStart_sec * 4)) * -0.5f, 0.0f);
+            }
 
             DirectX::XMMATRIX transform = skullRotationFixup * rotation * translation * levitation;
             DirectX::XMStoreFloat4x4(&mCPUSceneInstanceBuffer[skullMeshInstanceID].ModelWorld, transform);
