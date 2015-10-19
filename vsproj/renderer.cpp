@@ -603,6 +603,20 @@ void Renderer::Update(int deltaTime_ms)
     float deltaTime_sec = deltaTime_ms * 0.001f;
     mTimeSinceStart_sec += deltaTime_sec;
 
+    static float sTimeToDie = 1.5f;
+
+    sTimeToDie -= deltaTime_sec;
+    if (sTimeToDie <= 0.0f)
+    {
+        sTimeToDie = 1.5f;
+
+        if (mSkullTailPositions.size() >= 1)
+        {
+            mSkullTailPositions.pop_back();
+            mSkullTailLookDirections.pop_back();
+        }
+    }
+
     static const size_t kMaxCollectablesToMake = 10;
 
     for (size_t i = 0; i < mCollectableCPUParticles.size(); i++)
@@ -611,6 +625,15 @@ void Renderer::Update(int deltaTime_ms)
         {
             mCollectableCPUParticles[i].Intensity = 0.0f;
             mNumCollectablesCOllected++;
+
+            if (mSkullTailPositions.size() < 10)
+            {
+                DirectX::XMVECTOR tailPos = mSkullTailPositions.size() == 0 ? mSkullPosition : mSkullTailPositions.back();
+                DirectX::XMVECTOR tailRot = mSkullTailLookDirections.size() == 0 ? mSkullLookDirection : mSkullTailLookDirections.back();
+
+                mSkullTailPositions.push_back(DirectX::XMVectorAdd(tailPos, DirectX::XMVectorScale(mSkullLookDirection, -5.0f)));
+                mSkullTailLookDirections.push_back(tailRot);
+            }
         }
     }
 
@@ -655,8 +678,8 @@ void Renderer::Update(int deltaTime_ms)
 
     // Update skull position/direction
     {
-        static const float kForwardSpeed = 20.0f;
-        static const float kForwardAccl = 1.0f;
+        static const float kForwardSpeed = 30.0f;
+        static const float kForwardAccl = 2.5f;
         static const float kTimeToStop = 0.5f;
         
         float forwardAccelerationAmount = (mForwardHeld - mBackwardHeld) * kForwardAccl;
@@ -672,14 +695,34 @@ void Renderer::Update(int deltaTime_ms)
             mSkullSpeed = kForwardSpeed * (mSkullSpeed > 0 ? 1 : -1);
         }
 
+        DirectX::XMVECTOR oldPos = mSkullPosition;
+        DirectX::XMVECTOR oldRot = mSkullLookDirection;
+
         DirectX::XMVECTOR forwardMovement = DirectX::XMVectorScale(mSkullLookDirection, mSkullSpeed * deltaTime_sec);
         mSkullPosition = DirectX::XMVectorAdd(mSkullPosition, forwardMovement);
 
-        static const float kRotateSpeed = 3.0f;
+        static const float kRotateSpeed = 7.0f;
 
         float rotationAmount = -(mRotateLeftHeld - mRotateRightHeld) * kRotateSpeed * deltaTime_sec;
         DirectX::XMVECTOR rotationQuat = DirectX::XMQuaternionRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rotationAmount);
         mSkullLookDirection = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(mSkullLookDirection, rotationQuat));
+
+        if (mSkullTailLookDirections.size() >= 1)
+        for (int i = mSkullTailLookDirections.size() - 1; i >= 0; i--)
+        {
+            if (i == 0)
+            {
+                mSkullTailPositions[i] = oldPos;
+                mSkullTailLookDirections[i] = oldRot;
+                mSkullTailPositions[i] = DirectX::XMVectorAdd(oldPos, DirectX::XMVectorScale(mSkullTailLookDirections[i], -6.0f));
+            }
+            else
+            {
+                mSkullTailLookDirections[i] = mSkullTailLookDirections[i - 1];
+                mSkullTailPositions[i] = mSkullTailPositions[i - 1];
+                mSkullTailPositions[i] = DirectX::XMVectorAdd(mSkullTailPositions[i], DirectX::XMVectorScale(mSkullTailLookDirections[i], -6.0f));
+            }
+        }
     }
 
     // Deal with lightning
@@ -840,92 +883,98 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->Draw(36, 0);
     }
 
-    // Update model transforms
+    for (size_t skullIdx = 0; skullIdx < 1 + mSkullTailPositions.size(); skullIdx++)
     {
-        // update skull transforms
-        for (size_t skullMeshInstanceID : mSkullInstances)
+        // Update model transforms
         {
-            DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-            DirectX::XMVECTOR across = DirectX::XMVector3Cross(up, mSkullLookDirection);
-            DirectX::XMMATRIX rotation = DirectX::XMMatrixIdentity();
-            rotation.r[0] = across;
-            rotation.r[1] = up;
-            rotation.r[2] = mSkullLookDirection;
+            DirectX::XMVECTOR lookDirection = skullIdx == 0 ? mSkullLookDirection : mSkullTailLookDirections[skullIdx - 1];
+            DirectX::XMVECTOR skullPosition = skullIdx == 0 ? mSkullPosition : mSkullTailPositions[skullIdx - 1];
 
-            // skull model slightly off center
-            DirectX::XMMATRIX skullRotationFixup = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), -0.3f);
-
-            DirectX::XMMATRIX translation = DirectX::XMMatrixTranslationFromVector(mSkullPosition);
-            
-            // spooky levitation
-            DirectX::XMMATRIX levitation = DirectX::XMMatrixTranslation(0.0f, std::sinf((float)mTimeSinceStart_sec * 5) * 0.5f, 0.0f);
-
-            // extra spooky levitation
-            if (std::find(begin(mSkullJawInstances), end(mSkullJawInstances), skullMeshInstanceID) != end(mSkullJawInstances))
+            // update skull transforms
+            for (size_t skullMeshInstanceID : mSkullInstances)
             {
-                levitation = levitation * DirectX::XMMatrixTranslation(0.0f, std::abs(std::sin((float)mTimeSinceStart_sec * 4)) * -0.5f, 0.0f);
+                DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+                DirectX::XMVECTOR across = DirectX::XMVector3Cross(up, lookDirection);
+                DirectX::XMMATRIX rotation = DirectX::XMMatrixIdentity();
+                rotation.r[0] = across;
+                rotation.r[1] = up;
+                rotation.r[2] = lookDirection;
+
+                // skull model slightly off center
+                DirectX::XMMATRIX skullRotationFixup = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), -0.3f);
+
+                DirectX::XMMATRIX translation = DirectX::XMMatrixTranslationFromVector(skullPosition);
+
+                // spooky levitation
+                DirectX::XMMATRIX levitation = DirectX::XMMatrixTranslation(0.0f, std::sinf((float)mTimeSinceStart_sec * 5) * 0.5f, 0.0f);
+
+                // extra spooky levitation
+                if (std::find(begin(mSkullJawInstances), end(mSkullJawInstances), skullMeshInstanceID) != end(mSkullJawInstances))
+                {
+                    levitation = levitation * DirectX::XMMatrixTranslation(0.0f, std::abs(std::sin((float)mTimeSinceStart_sec * 4)) * -0.5f, 0.0f);
+                }
+
+                DirectX::XMMATRIX transform = skullRotationFixup * rotation * translation * levitation;
+                DirectX::XMStoreFloat4x4(&mCPUSceneInstanceBuffer[skullMeshInstanceID].ModelWorld, transform);
             }
 
-            DirectX::XMMATRIX transform = skullRotationFixup * rotation * translation * levitation;
-            DirectX::XMStoreFloat4x4(&mCPUSceneInstanceBuffer[skullMeshInstanceID].ModelWorld, transform);
-        }
-
-        // copy instance data
-        {
-            D3D11_MAPPED_SUBRESOURCE mappedInstances;
-            CHECK_HR(mpDeviceContext->Map(mpSceneInstanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedInstances));
-
-            PerInstanceData* pInstances = (PerInstanceData*)mappedInstances.pData;
-
-            for (size_t i = 0; i < mCPUSceneInstanceBuffer.size(); i++)
+            // copy instance data
             {
-                DirectX::XMMATRIX transform = DirectX::XMLoadFloat4x4(&mCPUSceneInstanceBuffer[i].ModelWorld);
-                DirectX::XMStoreFloat4x4(&pInstances[i].ModelWorld, DirectX::XMMatrixTranspose(transform));
-                pInstances[i].materialID = mCPUSceneInstanceBuffer[i].materialID;
+                D3D11_MAPPED_SUBRESOURCE mappedInstances;
+                CHECK_HR(mpDeviceContext->Map(mpSceneInstanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedInstances));
+
+                PerInstanceData* pInstances = (PerInstanceData*)mappedInstances.pData;
+
+                for (size_t i = 0; i < mCPUSceneInstanceBuffer.size(); i++)
+                {
+                    DirectX::XMMATRIX transform = DirectX::XMLoadFloat4x4(&mCPUSceneInstanceBuffer[i].ModelWorld);
+                    DirectX::XMStoreFloat4x4(&pInstances[i].ModelWorld, DirectX::XMMatrixTranspose(transform));
+                    pInstances[i].materialID = mCPUSceneInstanceBuffer[i].materialID;
+                }
+
+                mpDeviceContext->Unmap(mpSceneInstanceBuffer.Get(), 0);
             }
-
-            mpDeviceContext->Unmap(mpSceneInstanceBuffer.Get(), 0);
         }
-    }
 
-    // Draw models
-    {
-        ID3D11Buffer* pSceneVertexBuffers[SceneBufferBindings::Count]{};
-        UINT sceneStrides[SceneBufferBindings::Count]{};
-        UINT sceneOffsets[SceneBufferBindings::Count]{};
-
-        pSceneVertexBuffers[SceneBufferBindings::PositionOnlyBuffer] = mpScenePositionVertexBuffer.Get();
-        sceneStrides[SceneBufferBindings::PositionOnlyBuffer] = sizeof(float) * 3;
-
-        pSceneVertexBuffers[SceneBufferBindings::NormalBuffer] = mpScenePositionNormalBuffer.Get();
-        sceneStrides[SceneBufferBindings::NormalBuffer] = sizeof(float) * 3;
-
-        pSceneVertexBuffers[SceneBufferBindings::PerInstanceBuffer] = mpSceneInstanceBuffer.Get();
-        sceneStrides[SceneBufferBindings::PerInstanceBuffer] = sizeof(PerInstanceData);
-
-        mpDeviceContext->IASetVertexBuffers(0, _countof(pSceneVertexBuffers), pSceneVertexBuffers, sceneStrides, sceneOffsets);
-        mpDeviceContext->IASetIndexBuffer(mpSceneIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-        mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-        mpDeviceContext->VSSetShader(mpSceneVertexShader.Get(), NULL, 0);
-        mpDeviceContext->PSSetShader(mpScenePixelShader.Get(), NULL, 0);
-        mpDeviceContext->IASetInputLayout(mpSceneInputLayout.Get());
-        mpDeviceContext->RSSetState(mpSceneRasterizerState.Get());
-        mpDeviceContext->OMSetBlendState(NULL, NULL, UINT_MAX);
-        mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
-
-        mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
-        mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
-        mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpMaterialBuffer.GetAddressOf());
-
-        for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
+        // Draw models
         {
-            mpDeviceContext->DrawIndexedInstanced(
-                drawArgs.IndexCountPerInstance,
-                drawArgs.InstanceCount,
-                drawArgs.StartIndexLocation,
-                drawArgs.BaseVertexLocation,
-                drawArgs.StartInstanceLocation);
+            ID3D11Buffer* pSceneVertexBuffers[SceneBufferBindings::Count]{};
+            UINT sceneStrides[SceneBufferBindings::Count]{};
+            UINT sceneOffsets[SceneBufferBindings::Count]{};
+
+            pSceneVertexBuffers[SceneBufferBindings::PositionOnlyBuffer] = mpScenePositionVertexBuffer.Get();
+            sceneStrides[SceneBufferBindings::PositionOnlyBuffer] = sizeof(float) * 3;
+
+            pSceneVertexBuffers[SceneBufferBindings::NormalBuffer] = mpScenePositionNormalBuffer.Get();
+            sceneStrides[SceneBufferBindings::NormalBuffer] = sizeof(float) * 3;
+
+            pSceneVertexBuffers[SceneBufferBindings::PerInstanceBuffer] = mpSceneInstanceBuffer.Get();
+            sceneStrides[SceneBufferBindings::PerInstanceBuffer] = sizeof(PerInstanceData);
+
+            mpDeviceContext->IASetVertexBuffers(0, _countof(pSceneVertexBuffers), pSceneVertexBuffers, sceneStrides, sceneOffsets);
+            mpDeviceContext->IASetIndexBuffer(mpSceneIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+            mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+            mpDeviceContext->VSSetShader(mpSceneVertexShader.Get(), NULL, 0);
+            mpDeviceContext->PSSetShader(mpScenePixelShader.Get(), NULL, 0);
+            mpDeviceContext->IASetInputLayout(mpSceneInputLayout.Get());
+            mpDeviceContext->RSSetState(mpSceneRasterizerState.Get());
+            mpDeviceContext->OMSetBlendState(NULL, NULL, UINT_MAX);
+            mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
+
+            mpDeviceContext->VSSetConstantBuffers(SceneVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
+            mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::LightCBV, 1, mpLightBuffer.GetAddressOf());
+            mpDeviceContext->PSSetConstantBuffers(ScenePSConstantBufferSlots::MaterialCBV, 1, mpMaterialBuffer.GetAddressOf());
+
+            for (const D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS& drawArgs : mSceneDrawArgs)
+            {
+                mpDeviceContext->DrawIndexedInstanced(
+                    drawArgs.IndexCountPerInstance,
+                    drawArgs.InstanceCount,
+                    drawArgs.StartIndexLocation,
+                    drawArgs.BaseVertexLocation,
+                    drawArgs.StartInstanceLocation);
+            }
         }
     }
 
