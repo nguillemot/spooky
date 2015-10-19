@@ -3,6 +3,7 @@
 #include "dxutil.h"
 #include "camera.h"
 #include "PointLight.h"
+#include "Lightning.h"
 #include <DirectXMath.h>
 
 #include <vector>
@@ -96,6 +97,8 @@ class Renderer
     std::mt19937 mFogRNG;
     std::normal_distribution<float> mFogDistribution;
     size_t mTotalFogParticlesMade;
+
+	Lightning mLightning;
 
     int mClientWidth;
     int mClientHeight;

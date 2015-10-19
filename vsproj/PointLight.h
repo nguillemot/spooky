@@ -11,6 +11,7 @@ struct LightData
 	DirectX::XMFLOAT4 LightPosition;
 	DirectX::XMFLOAT4 AmbientLightColor;
 	float LightIntensity;
+	float LightningIntensity;
 };
 
 class PointLight

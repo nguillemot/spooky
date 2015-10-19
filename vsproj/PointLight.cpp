@@ -1,6 +1,6 @@
 #include "PointLight.h"
 
-
+#include <iostream>
 
 PointLight::PointLight()
 {

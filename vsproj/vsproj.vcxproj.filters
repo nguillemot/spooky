@@ -7,6 +7,7 @@
     <ClCompile Include="DDSTextureLoader.cpp" />
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="PointLight.cpp" />
+    <ClCompile Include="Lightning.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tiny_obj_loader.h" />
@@ -15,6 +16,7 @@
     <ClInclude Include="DDSTextureLoader.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="PointLight.h" />
+    <ClInclude Include="Lightning.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="skybox.vs.hlsl">
