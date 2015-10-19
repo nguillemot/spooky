@@ -95,7 +95,7 @@ void OrbitCamera::UpdateData()
 
 void OrbitCamera::OrbitX(float angle)
 {
-    mLongAngle += angle;
+    mLongAngle -= angle;
     UpdateData();
 }
 
