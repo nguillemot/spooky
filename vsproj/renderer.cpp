@@ -84,7 +84,8 @@ namespace WaterPSConstantBufferSlots
 {
     enum
     {
-        TimeCBV
+        TimeCBV,
+		LightningCBV
     };
 }
 
@@ -849,6 +850,7 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
         mpDeviceContext->VSSetConstantBuffers(WaterVSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
         mpDeviceContext->PSSetConstantBuffers(WaterPSConstantBufferSlots::TimeCBV, 1, mpTimeBuffer.GetAddressOf());
+		mpDeviceContext->PSSetConstantBuffers(WaterPSConstantBufferSlots::LightningCBV, 1, mpLightBuffer.GetAddressOf());
         mpDeviceContext->PSSetShaderResources(WaterPSShaderResourceSlots::WaterDepthSRV, 1, mpWaterDepthTextureSRV.GetAddressOf());
         mpDeviceContext->PSSetSamplers(WaterPSSamplerSlots::WaterDepthSMP, 1, mpWaterDepthSampler.GetAddressOf());
         mpDeviceContext->Draw(6, 0);
