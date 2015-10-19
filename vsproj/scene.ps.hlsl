@@ -59,7 +59,7 @@ PS_OUTPUT main(PS_INPUT input) {
     float3 aColor = (AmbientLightColor.xyz + AmbientColor) * dot(input.WorldNormal.xyz, NormalizedWorldPositionToCamera.xyz) / pow(DistanceFromCamera, 2) + (float3(1.f, 1.f, 1.f) * LightningIntensity);
 
     float4 LightDirectionToPosition = normalize(LightPosition - input.WorldPosition);
-    float LightToWorldPositionDistanceSquared = pow(length(input.WorldPosition - LightPosition), 2);
+    float LightToWorldPositionDistanceSquared = pow(length(input.WorldPosition - LightPosition), 1);
     float DiffuseIntensity = max(0, dot(LightDirectionToPosition, normalize(float4(input.WorldNormal, 0.f))));
     float3 dColor = ((DiffuseColor / 2) + LightColor.xyz) * DiffuseIntensity * LightIntensity;
 
@@ -71,7 +71,7 @@ PS_OUTPUT main(PS_INPUT input) {
 
     float3 sColor = float3(1.f, 1.f, 1.f) / 4 * SpecularIntensity;
 
-    output.Color = float4((aColor + dColor) + sColor, 0.f);
+    output.Color = float4(aColor + (dColor + sColor), 0.f);
     //output.Color = AmbientLightColor;
     //output.Color = aColor + float4(DiffuseColor * DiffuseIntensity, 0.f);
     return output;
