@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <algorithm>
+#include <iterator>
 
 namespace SceneBufferBindings
 {
@@ -170,6 +171,8 @@ Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
     mSkullPosition = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 
     mSkullLookDirection = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+
+    mSkullSpeed = 0.0f;
 }
 
 void Renderer::Init()
@@ -516,6 +519,15 @@ void Renderer::Init()
         D3D11_SAMPLER_DESC fogSamplerDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
         CHECK_HR(mpDevice->CreateSamplerState(&fogSamplerDesc, &mpFogSampler));
     }
+
+    // Load collectable texture
+    {
+        CHECK_HR(DirectX::CreateDDSTextureFromFileEx(
+            mpDevice, mpDeviceContext,
+            L"Skyboxes/apple.DDS",
+            (size_t)0, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0, true,
+            &mpCollectableTexture, &mpCollectableTextureSRV, nullptr));
+    }
 }
 
 void Renderer::Resize(int width, int height)
@@ -583,6 +595,31 @@ void Renderer::Update(int deltaTime_ms)
     float deltaTime_sec = deltaTime_ms * 0.001f;
     mTimeSinceStart_sec += deltaTime_sec;
 
+    static const size_t kMaxCollectablesToMake = 10;
+
+    for (size_t i = 0; i < mCollectableCPUParticles.size(); i++)
+    {
+        if (DirectX::XMVector3Length(DirectX::XMVectorSubtract(mSkullPosition, DirectX::XMLoadFloat3(&mCollectableCPUParticles[i].WorldPosition))).m128_f32[0] < 3.0f)
+        {
+            mCollectableCPUParticles[i].Intensity = 0.0f;
+            mNumCollectablesCOllected++;
+        }
+    }
+
+    mCollectableCPUParticles.erase(std::remove_if(begin(mCollectableCPUParticles), end(mCollectableCPUParticles),
+        [](const FogParticleData& part) { return part.Intensity <= 0.0f; }), mCollectableCPUParticles.end());
+
+    while (mCollectableCPUParticles.size() < kMaxCollectablesToMake)
+    {
+        FogParticleData particle{};
+        particle.Intensity = 0.5f;
+        float x = mFogDistribution(mFogRNG) * 15.0f;
+        float y = 2.0f;
+        float z = mFogDistribution(mFogRNG) * 15.0f;
+        DirectX::XMStoreFloat3(&particle.WorldPosition, DirectX::XMVectorSet(x, y, z, 1.0f));
+        mCollectableCPUParticles.push_back(particle);
+    }
+
     static const size_t kMaxParticlesToMake = 1000;
     static const float kAvgTimeToDeath = 10.0f;
 
@@ -610,13 +647,27 @@ void Renderer::Update(int deltaTime_ms)
 
     // Update skull position/direction
     {
-        static const float kForwardSpeed = 5.0f;
-        
-        float forwardMovementAmount = (mForwardHeld - mBackwardHeld) * kForwardSpeed;
-        DirectX::XMVECTOR forwardMovement = DirectX::XMVectorScale(mSkullLookDirection, forwardMovementAmount * deltaTime_sec);
+        static const float kForwardSpeed = 20.0f;
+        static const float kForwardAccl = 1.0f;
+        static const float kTimeToStop = 0.5f;
+
+        float forwardAccelerationAmount = (mForwardHeld - mBackwardHeld) * kForwardAccl;
+        mSkullSpeed += forwardAccelerationAmount;
+
+        if (forwardAccelerationAmount == 0.0f)
+        {
+            mSkullSpeed *= 1.0f - deltaTime_sec / kTimeToStop;
+        }
+
+        if (std::abs(mSkullSpeed) > kForwardSpeed)
+        {
+            mSkullSpeed = kForwardSpeed * (mSkullSpeed > 0 ? 1 : -1);
+        }
+
+        DirectX::XMVECTOR forwardMovement = DirectX::XMVectorScale(mSkullLookDirection, mSkullSpeed * deltaTime_sec);
         mSkullPosition = DirectX::XMVectorAdd(mSkullPosition, forwardMovement);
 
-        static const float kRotateSpeed = 1.0f;
+        static const float kRotateSpeed = 3.0f;
 
         float rotationAmount = -(mRotateLeftHeld - mRotateRightHeld) * kRotateSpeed * deltaTime_sec;
         DirectX::XMVECTOR rotationQuat = DirectX::XMQuaternionRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rotationAmount);
@@ -886,11 +937,34 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->Draw(6, 0);
     }
 
-    // Draw fog
+    // Draw particles (fog, collectables..)
     {
+        struct FogParticleDataPlus : FogParticleData {
+            ID3D11ShaderResourceView* srv;
+        };
+
+        std::vector<FogParticleDataPlus> cpuParticles;
+
+        for (size_t i = 0; i < mFogCPUParticles.size(); i++)
+        {
+            FogParticleDataPlus plus;
+            plus.WorldPosition = mFogCPUParticles[i].WorldPosition;
+            plus.Intensity = mFogCPUParticles[i].Intensity;
+            plus.srv = mpFogTextureSRV.Get();
+            cpuParticles.push_back(plus);
+        }
+        for (size_t i = 0; i < mCollectableCPUParticles.size(); i++)
+        {
+            FogParticleDataPlus plus;
+            plus.WorldPosition = mCollectableCPUParticles[i].WorldPosition;
+            plus.Intensity = mCollectableCPUParticles[i].Intensity;
+            plus.srv = mpCollectableTextureSRV.Get();
+            cpuParticles.push_back(plus);
+        }
+
         // Sort particles from back to front
         {
-            std::sort(begin(mFogCPUParticles), end(mFogCPUParticles),
+            std::sort(begin(cpuParticles), end(cpuParticles),
                 [&](const FogParticleData& p1, const FogParticleData& p2)
             {
                 DirectX::XMVECTOR pos1 = DirectX::XMLoadFloat3(&p1.WorldPosition);
@@ -912,9 +986,9 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
                 mpFogGPUParticles->GetDesc(&bufferDesc);
             }
 
-            if (bufferDesc.ByteWidth < mFogCPUParticles.size() * sizeof(FogParticleData))
+            if (bufferDesc.ByteWidth < cpuParticles.size() * sizeof(FogParticleData))
             {
-                bufferDesc.ByteWidth = (UINT)((mFogCPUParticles.size() + 100) * sizeof(FogParticleData));
+                bufferDesc.ByteWidth = (UINT)((cpuParticles.size() + 100) * sizeof(FogParticleData));
                 bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
                 bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
                 bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -922,12 +996,18 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
                 CHECK_HR(mpDevice->CreateBuffer(&bufferDesc, NULL, &mpFogGPUParticles));
             }
 
-            if (!mFogCPUParticles.empty())
+            if (!cpuParticles.empty())
             {
                 D3D11_MAPPED_SUBRESOURCE mapped;
                 CHECK_HR(mpDeviceContext->Map(mpFogGPUParticles.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped));
 
-                memcpy(mapped.pData, mFogCPUParticles.data(), mFogCPUParticles.size() * sizeof(FogParticleData));
+                std::vector<FogParticleData> plainFogParticleData(cpuParticles.size());
+                for (size_t i = 0; i < cpuParticles.size(); i++)
+                {
+                    plainFogParticleData[i].Intensity = cpuParticles[i].Intensity;
+                    plainFogParticleData[i].WorldPosition = cpuParticles[i].WorldPosition;
+                }
+                memcpy(mapped.pData, plainFogParticleData.data(), plainFogParticleData.size() * sizeof(FogParticleData));
 
                 mpDeviceContext->Unmap(mpFogGPUParticles.Get(), 0);
             }
@@ -942,7 +1022,6 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         mpDeviceContext->OMSetDepthStencilState(mpSceneDepthStencilState.Get(), 0);
         mpDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
         mpDeviceContext->GSSetConstantBuffers(FogGSConstantBufferSlots::CameraCBV, 1, mpCameraBuffer.GetAddressOf());
-        mpDeviceContext->PSSetShaderResources(FogPSShaderResourceSlots::FogTextureSRV, 1, mpFogTextureSRV.GetAddressOf());
         mpDeviceContext->PSSetSamplers(FogPSSamplerSlots::FogSMP, 1, mpFogSampler.GetAddressOf());
 
         ID3D11Buffer* fogBuffers[FogBufferBindingSlots::Count]{};
@@ -953,7 +1032,12 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         fogStrides[FogBufferBindingSlots::PerParticleData] = sizeof(FogParticleData);
         mpDeviceContext->IASetVertexBuffers(FogBufferBindingSlots::PerParticleData, FogBufferBindingSlots::Count, fogBuffers, fogStrides, fogOffsets);
 
-        mpDeviceContext->Draw((UINT)mFogCPUParticles.size(), 0);
+        for (size_t i = 0; i < cpuParticles.size(); i++)
+        {
+            mpDeviceContext->PSSetShaderResources(FogPSShaderResourceSlots::FogTextureSRV, 1, &cpuParticles[i].srv);
+            mpDeviceContext->Draw(1, (UINT)i);
+        }
+        
         mpDeviceContext->GSSetShader(NULL, NULL, 0);
     }
 }

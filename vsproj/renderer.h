@@ -95,6 +95,12 @@ class Renderer
     std::vector<FogParticleData> mFogCPUParticles;
     ComPtr<ID3D11Buffer> mpFogGPUParticles;
 
+    std::vector<FogParticleData> mCollectableCPUParticles;
+    ComPtr<ID3D11Buffer> mpCollectableGPUParticles;
+
+    ComPtr<ID3D11Resource> mpCollectableTexture;
+    ComPtr<ID3D11ShaderResourceView> mpCollectableTextureSRV;
+
     std::mt19937 mFogRNG;
     std::normal_distribution<float> mFogDistribution;
     size_t mTotalFogParticlesMade;
@@ -110,7 +116,13 @@ class Renderer
     bool mRotateRightHeld;
 
     DirectX::XMVECTOR mSkullPosition;
+    float mSkullSpeed;
     DirectX::XMVECTOR mSkullLookDirection;
+
+    std::vector<DirectX::XMVECTOR> mSkullTailPositions;
+    std::vector<DirectX::XMVECTOR> mSkullTailLookDirections;
+
+    int mNumCollectablesCOllected = 0;
 
 public:
     Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext);
