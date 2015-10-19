@@ -51,11 +51,11 @@ void InitApp()
 #define SIM_ORBIT_RADIUS 50.f
 #define SIM_DISC_RADIUS  12.f
     auto center = DirectX::XMVectorSet(0.0f, 0.4f*SIM_DISC_RADIUS, 0.0f, 0.0f);
-    auto radius = 15.0f;
+    auto radius = 35.0f;
     auto minRadius = SIM_ORBIT_RADIUS - 3.25f * SIM_DISC_RADIUS;
     auto maxRadius = SIM_ORBIT_RADIUS + 3.0f * SIM_DISC_RADIUS;
-    auto longAngle = 4.50f;
-    auto latAngle = 1.45f;
+    auto longAngle = 1.50f;
+    auto latAngle = 0.75f;
     gCamera.View(center, radius, minRadius, maxRadius, longAngle, latAngle);
 }
 

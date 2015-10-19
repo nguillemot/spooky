@@ -18,7 +18,7 @@
 #include "fog.ps.hlsl.h"
 
 #include <iostream>
-#include <algorithm>
+#include <algorithm> 
 #include <iterator>
 
 namespace SceneBufferBindings
@@ -701,14 +701,14 @@ void Renderer::Update(int deltaTime_ms)
         DirectX::XMVECTOR forwardMovement = DirectX::XMVectorScale(mSkullLookDirection, mSkullSpeed * deltaTime_sec);
         mSkullPosition = DirectX::XMVectorAdd(mSkullPosition, forwardMovement);
 
-        static const float kRotateSpeed = 7.0f;
+        static const float kRotateSpeed = 6.5f;
 
         float rotationAmount = -(mRotateLeftHeld - mRotateRightHeld) * kRotateSpeed * deltaTime_sec;
         DirectX::XMVECTOR rotationQuat = DirectX::XMQuaternionRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rotationAmount);
         mSkullLookDirection = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(mSkullLookDirection, rotationQuat));
 
         if (mSkullTailLookDirections.size() >= 1)
-        for (int i = mSkullTailLookDirections.size() - 1; i >= 0; i--)
+        for (int i = (int)mSkullTailLookDirections.size() - 1; i >= 0; i--)
         {
             if (i == 0)
             {
