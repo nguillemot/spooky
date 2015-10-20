@@ -8,6 +8,7 @@
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="PointLight.cpp" />
     <ClCompile Include="Lightning.cpp" />
+    <ClCompile Include="Sound.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tiny_obj_loader.h" />

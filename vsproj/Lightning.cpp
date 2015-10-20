@@ -1,6 +1,10 @@
 #include "Lightning.h"
+#include "xaudio2.h"
 
 #include <random>
+
+extern IXAudio2SourceVoice* gpSource;
+extern XAUDIO2_BUFFER gXAudio2Buffer;
 
 Lightning::Lightning() :
 	flashing(false),
@@ -35,6 +39,9 @@ void Lightning::doFlash(int deltaTime_ms)
 		delay -= deltaTime_ms / 1000.f;
 		if (delay <= 0.f) {
 			delay = 0.f;
+			gpSource->Start();
+			gpSource->SubmitSourceBuffer(&gXAudio2Buffer);
+
 			intensity = .5f;
 		}
 	}
