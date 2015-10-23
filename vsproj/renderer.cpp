@@ -624,6 +624,8 @@ void Renderer::Update(int deltaTime_ms)
         {
             mCollectableCPUParticles[i].Intensity = 0.0f;
             mNumCollectablesCOllected++;
+			gpSourceCollectible->Start();
+			gpSourceCollectible->SubmitSourceBuffer(&gXAudio2BufferCollectible);
 
             if (mSkullTailPositions.size() < 10)
             {

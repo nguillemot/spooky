@@ -8,9 +8,13 @@
 #include "d2d1.h"
 #include "wincodec.h"
 #include <DirectXMath.h>
+#include "xaudio2.h"
 
 #include <vector>
 #include <random>
+
+extern IXAudio2SourceVoice* gpSourceCollectible;
+extern XAUDIO2_BUFFER gXAudio2BufferCollectible;
 
 class Renderer
 {
@@ -68,7 +72,6 @@ class Renderer
     ComPtr<ID3D11InputLayout> mpSceneInputLayout;
     ComPtr<ID3D11RasterizerState> mpSceneRasterizerState;
     ComPtr<ID3D11DepthStencilState> mpSceneDepthStencilState;
-
 
     ComPtr<ID3D11Resource> mpSkyboxTexture;
     ComPtr<ID3D11ShaderResourceView> mpSkyboxTextureSRV;
