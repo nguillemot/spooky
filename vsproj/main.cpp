@@ -19,6 +19,8 @@
 #pragma comment(lib, "ninput.lib")
 #pragma comment(lib, "shcore.lib")
 #pragma comment(lib, "xaudio2.lib")
+//#pragma comment(lib, "dwrite.lib")
+//#pragma comment(lib, "d2d1.lib")
 
 #ifdef _XBOX //Big-Endian
 #define fourccRIFF 'RIFF'
@@ -432,6 +434,6 @@ int main()
         // Swap buffers
         CHECK_HR(gpSwapChain->Present(0, 0));
     }
-	CoUninitialize();
+	CoUninitialize(); // <- this currently creates problems with the WIC Factory.
     CHECK_HR(gpSwapChain->SetFullscreenState(FALSE, NULL));
 }

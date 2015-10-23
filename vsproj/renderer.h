@@ -4,6 +4,9 @@
 #include "camera.h"
 #include "PointLight.h"
 #include "Lightning.h"
+#include "dwrite_2.h"
+#include "d2d1.h"
+#include "wincodec.h"
 #include <DirectXMath.h>
 
 #include <vector>
@@ -65,6 +68,7 @@ class Renderer
     ComPtr<ID3D11InputLayout> mpSceneInputLayout;
     ComPtr<ID3D11RasterizerState> mpSceneRasterizerState;
     ComPtr<ID3D11DepthStencilState> mpSceneDepthStencilState;
+
 
     ComPtr<ID3D11Resource> mpSkyboxTexture;
     ComPtr<ID3D11ShaderResourceView> mpSkyboxTextureSRV;

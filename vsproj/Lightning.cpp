@@ -39,8 +39,7 @@ void Lightning::doFlash(int deltaTime_ms)
 		delay -= deltaTime_ms / 1000.f;
 		if (delay <= 0.f) {
 			delay = 0.f;
-			gpSource->Start();
-			gpSource->SubmitSourceBuffer(&gXAudio2Buffer);
+			
 
 			intensity = .5f;
 		}
@@ -49,6 +48,8 @@ void Lightning::doFlash(int deltaTime_ms)
 		intensity -= deltaTime_ms / 1000.f / flashDuration;
 		if (intensity <= 0.f) {
 			intensity = 0.f;
+			gpSource->Start();
+			gpSource->SubmitSourceBuffer(&gXAudio2Buffer);
 			flashing = false;
 		}
 	}
