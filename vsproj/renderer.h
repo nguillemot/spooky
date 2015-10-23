@@ -4,10 +4,17 @@
 #include "camera.h"
 #include "PointLight.h"
 #include "Lightning.h"
+#include "dwrite_2.h"
+#include "d2d1.h"
+#include "wincodec.h"
 #include <DirectXMath.h>
+#include "xaudio2.h"
 
 #include <vector>
 #include <random>
+
+extern IXAudio2SourceVoice* gpSourceCollectible;
+extern XAUDIO2_BUFFER gXAudio2BufferCollectible;
 
 class Renderer
 {

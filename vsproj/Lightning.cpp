@@ -3,8 +3,8 @@
 
 #include <random>
 
-extern IXAudio2SourceVoice* gpSource;
-extern XAUDIO2_BUFFER gXAudio2Buffer;
+extern IXAudio2SourceVoice* gpSourceThunder;
+extern XAUDIO2_BUFFER gXAudio2BufferThunder;
 
 Lightning::Lightning() :
 	flashing(false),
@@ -48,9 +48,9 @@ void Lightning::doFlash(int deltaTime_ms)
 		intensity -= deltaTime_ms / 1000.f / flashDuration;
 		if (intensity <= 0.f) {
 			intensity = 0.f;
+			gpSourceThunder->Start();
+			gpSourceThunder->SubmitSourceBuffer(&gXAudio2BufferThunder);
 			flashing = false;
-			gpSource->Start();
-			gpSource->SubmitSourceBuffer(&gXAudio2Buffer);
 		}
 	}
 }

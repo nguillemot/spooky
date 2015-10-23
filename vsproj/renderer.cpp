@@ -185,6 +185,7 @@ Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
 
 void Renderer::Init()
 {
+
     std::string inputfile = "Models/skull.obj";
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -373,8 +374,6 @@ void Renderer::Init()
         rasterizerDesc.FrontCounterClockwise = TRUE;
         CHECK_HR(mpDevice->CreateRasterizerState(&rasterizerDesc, &mpSceneRasterizerState));
 
-        D3D11_DEPTH_STENCIL_DESC depthStencilDesc = CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT());
-        CHECK_HR(mpDevice->CreateDepthStencilState(&depthStencilDesc, &mpSceneDepthStencilState));
     }
 
     // Create material data
@@ -625,6 +624,8 @@ void Renderer::Update(int deltaTime_ms)
         {
             mCollectableCPUParticles[i].Intensity = 0.0f;
             mNumCollectablesCOllected++;
+			gpSourceCollectible->Start();
+			gpSourceCollectible->SubmitSourceBuffer(&gXAudio2BufferCollectible);
 
             if (mSkullTailPositions.size() < 10)
             {
@@ -751,6 +752,8 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
 
         CameraData* pCamera = (CameraData*)mappedCamera.pData;
 
+		
+
         DirectX::XMVECTOR eye = camera.Eye();
         DirectX::XMVECTOR center = DirectX::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f);
         DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -790,8 +793,13 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
 
 			*/
 
-            DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f, 1.0f);
+			
+
+			UINT intensity = (UINT) mSkullTailLookDirections.size();
+
+            DirectX::XMFLOAT4 lightColor(0.7f, 0.4f, 0.1f * intensity, 1.0f);
             DirectX::XMFLOAT4 lightPosition(0.f, -10.f, 1.f, 1.f);
+
             float t = (float)mTimeSinceStart_sec;
             float lightIntensity = (sin(t) + 1.f) * (sin(t) / 1.5f) + (2.f / 3.f);
 
@@ -1098,4 +1106,9 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
         
         mpDeviceContext->GSSetShader(NULL, NULL, 0);
     }
+
+	// Render HUD
+	{
+		
+	}
 }

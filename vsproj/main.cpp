@@ -19,6 +19,8 @@
 #pragma comment(lib, "ninput.lib")
 #pragma comment(lib, "shcore.lib")
 #pragma comment(lib, "xaudio2.lib")
+#pragma comment(lib, "dwrite.lib")
+#pragma comment(lib, "d2d1.lib")
 
 #ifdef _XBOX //Big-Endian
 #define fourccRIFF 'RIFF'
@@ -37,6 +39,7 @@
 #define fourccXWMA 'AMWX'
 #define fourccDPDS 'sdpd'
 #endif
+
 
 // Constants
 static const int kSwapChainBufferCount = 3;
@@ -61,9 +64,12 @@ int gRenderWidth;
 int gRenderHeight;
 
 ComPtr<IXAudio2> gpXAudio2;
-IXAudio2SourceVoice* gpSource;
-XAUDIO2_BUFFER gXAudio2Buffer;
+IXAudio2SourceVoice* gpSourceThunder;
+IXAudio2SourceVoice* gpSourceCollectible;
+XAUDIO2_BUFFER gXAudio2BufferThunder;
+XAUDIO2_BUFFER gXAudio2BufferCollectible;
 WAVEFORMATEX gWfxThunder = { 0 };
+WAVEFORMATEX gWfxCollectible = { 0 };
 
 
 void StartXAudio2() {
@@ -146,59 +152,108 @@ HRESULT ReadChunkData(HANDLE hFile, void * buffer, DWORD buffersize, DWORD buffe
 HRESULT LoadSoundFiles() {
 	HRESULT hr = S_OK;
 	
-	TCHAR * strFileName = "Sounds\\thunder.wav";
+	// Load the thunder sound effect
+	{
+		TCHAR * strFileName = "Sounds\\thunder.wav";
 
-	// Open the file
-	HANDLE hFile = CreateFile(
-		strFileName,
-		GENERIC_READ,
-		FILE_SHARE_READ,
-		NULL,
-		OPEN_EXISTING,
-		0,
-		NULL);
+		// Open the file
+		HANDLE hFile = CreateFile(
+			strFileName,
+			GENERIC_READ,
+			FILE_SHARE_READ,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
 
-	if (INVALID_HANDLE_VALUE == hFile) {
-		std::cout << "Invalid file handle value" << '\n';
-		return HRESULT_FROM_WIN32(GetLastError());
+		if (INVALID_HANDLE_VALUE == hFile) {
+			std::cout << "Invalid file handle value" << '\n';
+			return HRESULT_FROM_WIN32(GetLastError());
+		}
+
+		if (INVALID_SET_FILE_POINTER == SetFilePointer(hFile, 0, NULL, FILE_BEGIN)) {
+			std::cout << "Invalid set file pointer" << '\n';
+			return HRESULT_FROM_WIN32(GetLastError());
+		}
+
+		DWORD dwChunkSize;
+		DWORD dwChunkPosition;
+		//check the file type, should be fourccWAVE or 'XWMA'
+		FindChunk(hFile, fourccRIFF, dwChunkSize, dwChunkPosition);
+		DWORD filetype;
+		ReadChunkData(hFile, &filetype, sizeof(DWORD), dwChunkPosition);
+		if (filetype != fourccWAVE)
+			return S_FALSE;
+
+		FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
+		ReadChunkData(hFile, &gWfxThunder, dwChunkSize, dwChunkPosition);
+
+		//fill out the audio data buffer with the contents of the fourccDATA chunk
+		FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
+		BYTE * pDataBuffer = new BYTE[dwChunkSize];
+		ReadChunkData(hFile, pDataBuffer, dwChunkSize, dwChunkPosition);
+
+		gXAudio2BufferThunder.AudioBytes = dwChunkSize;  //buffer containing audio data
+		gXAudio2BufferThunder.pAudioData = pDataBuffer;  //size of the audio buffer in bytes
+		gXAudio2BufferThunder.Flags = XAUDIO2_END_OF_STREAM; // tell the source voice not to expect any data after this buffer
 	}
 
-	if (INVALID_SET_FILE_POINTER == SetFilePointer(hFile, 0, NULL, FILE_BEGIN)) {
-		std::cout << "Invalid set file pointer" << '\n';
-		return HRESULT_FROM_WIN32(GetLastError());
+	// Now do the same for the apple sound.
+	{
+		TCHAR * strFileName = "Sounds\\smw_coin.wav";
+
+		// Open the file
+		HANDLE hFile = CreateFile(
+			strFileName,
+			GENERIC_READ,
+			FILE_SHARE_READ,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
+
+		if (INVALID_HANDLE_VALUE == hFile) {
+			std::cout << "Invalid file handle value" << '\n';
+			return HRESULT_FROM_WIN32(GetLastError());
+		}
+
+		if (INVALID_SET_FILE_POINTER == SetFilePointer(hFile, 0, NULL, FILE_BEGIN)) {
+			std::cout << "Invalid set file pointer" << '\n';
+			return HRESULT_FROM_WIN32(GetLastError());
+		}
+
+		DWORD dwChunkSize;
+		DWORD dwChunkPosition;
+		//check the file type, should be fourccWAVE or 'XWMA'
+		FindChunk(hFile, fourccRIFF, dwChunkSize, dwChunkPosition);
+		DWORD filetype;
+		ReadChunkData(hFile, &filetype, sizeof(DWORD), dwChunkPosition);
+		if (filetype != fourccWAVE)
+			return S_FALSE;
+
+		FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
+		ReadChunkData(hFile, &gWfxCollectible, dwChunkSize, dwChunkPosition);
+
+		//fill out the audio data buffer with the contents of the fourccDATA chunk
+		FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
+		BYTE * pDataBuffer = new BYTE[dwChunkSize];
+		ReadChunkData(hFile, pDataBuffer, dwChunkSize, dwChunkPosition);
+
+		gXAudio2BufferCollectible.AudioBytes = dwChunkSize;  //buffer containing audio data
+		gXAudio2BufferCollectible.pAudioData = pDataBuffer;  //size of the audio buffer in bytes
+		gXAudio2BufferCollectible.Flags = XAUDIO2_END_OF_STREAM; // tell the source voice not to expect any data after this buffer
 	}
-
-	DWORD dwChunkSize;
-	DWORD dwChunkPosition;
-	//check the file type, should be fourccWAVE or 'XWMA'
-	FindChunk(hFile, fourccRIFF, dwChunkSize, dwChunkPosition);
-	DWORD filetype;
-	ReadChunkData(hFile, &filetype, sizeof(DWORD), dwChunkPosition);
-	if (filetype != fourccWAVE)
-		return S_FALSE;
-
-	FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
-	ReadChunkData(hFile, &gWfxThunder, dwChunkSize, dwChunkPosition);
-
-	//fill out the audio data buffer with the contents of the fourccDATA chunk
-	FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
-	BYTE * pDataBuffer = new BYTE[dwChunkSize];
-	ReadChunkData(hFile, pDataBuffer, dwChunkSize, dwChunkPosition);
-
-	gXAudio2Buffer.AudioBytes = dwChunkSize;  //buffer containing audio data
-	gXAudio2Buffer.pAudioData = pDataBuffer;  //size of the audio buffer in bytes
-	gXAudio2Buffer.Flags = XAUDIO2_END_OF_STREAM; // tell the source voice not to expect any data after this buffer
-
 	return hr;
 }
 
+
 void InitApp()
 {
-
 	StartXAudio2();
 	CHECK_HR(LoadSoundFiles());
 
-	CHECK_HR(gpXAudio2->CreateSourceVoice(&gpSource, &gWfxThunder));
+	CHECK_HR(gpXAudio2->CreateSourceVoice(&gpSourceThunder, &gWfxThunder));
+	CHECK_HR(gpXAudio2->CreateSourceVoice(&gpSourceCollectible, &gWfxCollectible));
 
     LARGE_INTEGER performanceFrequency, firstFrameTicks;
     CHECK_WIN32(QueryPerformanceFrequency(&performanceFrequency));
@@ -432,6 +487,6 @@ int main()
         // Swap buffers
         CHECK_HR(gpSwapChain->Present(0, 0));
     }
-	CoUninitialize();
+	CoUninitialize(); // <- this currently creates problems with the WIC Factory.
     CHECK_HR(gpSwapChain->SetFullscreenState(FALSE, NULL));
 }
