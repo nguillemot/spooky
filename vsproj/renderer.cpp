@@ -162,11 +162,16 @@ struct TimeData
     float TimeSinceStart_sec;
 };
 
-Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext)
+Renderer::Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext, IDXGIDevice* pDxgiDevice, UINT dpi)
     : mpDevice(pDevice)
     , mpDeviceContext(pDeviceContext)
     , mFogRNG(std::random_device()())
+	, mpDxgiDevice(pDxgiDevice)
+	, mDpi(dpi)
 {
+	// D2D
+	
+	//
     mTotalFogParticlesMade = 0;
     mTimeSinceStart_sec = 0.0;
 
@@ -208,6 +213,24 @@ void Renderer::Init()
             mSkullJawInstances.push_back(i);
     }
     }
+
+	{
+		// Initialize Direct2D stuff
+		CHECK_HR(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &mpD2DFactory));
+		
+		CHECK_HR(mpD2DFactory->CreateDevice(mpDxgiDevice, &mpD2DDevice));
+
+		bitmapProperties = D2D1::BitmapProperties1(
+				D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+				D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE),
+				(FLOAT)mDpi,
+				(FLOAT)mDpi
+				);
+
+		DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&mpDWriteFactory));
+
+		
+	}
 
     // Create position vertex staging buffer
     {
@@ -534,7 +557,7 @@ void Renderer::Init()
             L"Skyboxes/apple.DDS",
             (size_t)0, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0, true,
             &mpCollectableTexture, &mpCollectableTextureSRV, nullptr));
-}
+	}
 }
 
 void Renderer::Resize(int width, int height)
@@ -560,6 +583,7 @@ void Renderer::Resize(int width, int height)
         dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
         CHECK_HR(mpDevice->CreateDepthStencilView(mpSceneDepthBuffer.Get(), &dsvDesc, &mpSceneDSV));
     }
+
 }
 
 void Renderer::HandleEvent(UINT message, WPARAM wParam, LPARAM lParam)
@@ -626,6 +650,9 @@ void Renderer::Update(int deltaTime_ms)
             mNumCollectablesCOllected++;
 			gpSourceCollectible->Start();
 			gpSourceCollectible->SubmitSourceBuffer(&gXAudio2BufferCollectible);
+			if (mSkullTailPositions.size() > mMaxCongaLine) {
+				mMaxCongaLine = (int)mSkullTailPositions.size();
+			}
 
             if (mSkullTailPositions.size() < 10)
             {
@@ -1109,6 +1136,104 @@ void Renderer::RenderFrame(ID3D11RenderTargetView* pRTV, const OrbitCamera& came
 
 	// Render HUD
 	{
+		ComPtr<IDXGISurface> mpDxgiBackBuffer;
+		ComPtr<ID3D11Texture2D> mpBackBuffer;
+		ComPtr<ID2D1DeviceContext> mpD2DContext;
 		
+		ComPtr<ID2D1Bitmap1> mpD2DTargetBitmap;
+
+		CHECK_HR(mpD2DDevice->CreateDeviceContext(
+			D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+			mpD2DContext.GetAddressOf()
+			));
+
+		CHECK_HR(
+			gpSwapChain->GetBuffer(0, IID_PPV_ARGS(&mpBackBuffer))
+			);
+
+		// Direct2D needs the dxgi version of the backbuffer surface pointer.
+		CHECK_HR(
+			gpSwapChain->GetBuffer(0, IID_PPV_ARGS(mpDxgiBackBuffer.GetAddressOf()))
+			);
+
+		// Get a D2D surface from the DXGI back buffer to use as the D2D render target.
+		CHECK_HR(
+			mpD2DContext->CreateBitmapFromDxgiSurface(
+				mpDxgiBackBuffer.Get(),
+				&bitmapProperties,
+				&mpD2DTargetBitmap
+				)
+			);
+
+		// Now we can set the Direct2D render target.
+		mpD2DContext->SetTarget(mpD2DTargetBitmap.Get());
+
+		// Now we can actually draw the HUD
+	
+		ComPtr<ID2D1SolidColorBrush> pWhiteBrush;
+		CHECK_HR(
+			mpD2DContext->CreateSolidColorBrush(
+				D2D1::ColorF(D2D1::ColorF::White),
+				&pWhiteBrush
+				)
+			);
+
+		mpD2DContext->BeginDraw();
+
+		D2D1_SIZE_F D2Dsize = mpD2DTargetBitmap->GetSize();
+
+		D2D_RECT_F destRect = D2D1::RectF (
+				D2Dsize.width / 50.f,
+				D2Dsize.height / 50.f,
+				D2Dsize.width,
+				D2Dsize.height);
+
+		
+
+		WCHAR outputString[100];
+		swprintf(outputString, (size_t) 100, L"Apples Collected: %d\nCurrent Conga Line: %d\nLongest Conga Line: %d", mNumCollectablesCOllected, (int)mSkullTailPositions.size(), mMaxCongaLine);
+		UINT32 outputLength = (UINT32) wcslen(outputString);
+		IDWriteTextFormat* outputFormat;
+
+		mpDWriteFactory->CreateTextFormat(
+			L"Arial",                // Font family name.
+			NULL,                       // Font collection (NULL sets it to use the system font collection).
+			DWRITE_FONT_WEIGHT_REGULAR,
+			DWRITE_FONT_STYLE_NORMAL,
+			DWRITE_FONT_STRETCH_NORMAL,
+			16.0f,
+			L"en-us",
+			&outputFormat
+			);
+
+		mpD2DContext->DrawText(
+			(WCHAR*) outputString,        // The string to render.
+			outputLength,    // The string's length.
+			outputFormat,    // The text format.
+			&destRect,       // The region of the window where the text will be rendered.
+			pWhiteBrush.Get()     // The brush used to draw the text.
+			);
+		
+		/*
+		mpD2DContext->DrawRectangle(
+			&destRect,
+			pWhiteBrush.Get(),
+			1.0f,
+			NULL
+			);
+		*/
+
+		CHECK_HR(
+			mpD2DContext->EndDraw()
+			);
+
+		CHECK_HR(
+			gpSwapChain->Present(1, 0);
+		);
+
+		mpBackBuffer = nullptr;
+		mpDxgiBackBuffer = nullptr;
+
 	}
+	// End of HUD drawing
 }

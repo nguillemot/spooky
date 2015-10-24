@@ -9,12 +9,15 @@
 #include "wincodec.h"
 #include <DirectXMath.h>
 #include "xaudio2.h"
+#include "D2d1_1.h"
+#include "D2d1_1helper.h"
 
 #include <vector>
 #include <random>
 
 extern IXAudio2SourceVoice* gpSourceCollectible;
 extern XAUDIO2_BUFFER gXAudio2BufferCollectible;
+extern ComPtr<IDXGISwapChain> gpSwapChain;
 
 class Renderer
 {
@@ -58,6 +61,17 @@ class Renderer
     ComPtr<ID3D11Buffer> mpLightBuffer;
     ComPtr<ID3D11Buffer> mpMaterialBuffer;
     ComPtr<ID3D11Buffer> mpTimeBuffer;
+
+	// Direct2D stuff
+	ID2D1Factory1* mpD2DFactory;
+	IDXGIDevice* mpDxgiDevice;
+	ID2D1Device* mpD2DDevice;
+	
+	D2D1_BITMAP_PROPERTIES1 bitmapProperties;
+	
+	IDWriteFactory* mpDWriteFactory;
+	UINT mDpi;
+	// End of Direct2D Stuff
 
     double mTimeSinceStart_sec;
 
@@ -129,10 +143,11 @@ class Renderer
     std::vector<DirectX::XMVECTOR> mSkullTailPositions;
     std::vector<DirectX::XMVECTOR> mSkullTailLookDirections;
 
+	int mMaxCongaLine = 0;
     int mNumCollectablesCOllected = 0;
 
 public:
-    Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext);
+    Renderer(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext, IDXGIDevice* pDxgiDevice, UINT dpi);
 
     void Init();
 

@@ -7,6 +7,9 @@
 #include "camera.h"
 
 #include "xaudio2.h"
+#include "d2d1.h"
+#include "D2d1_1.h"
+#include "D2d1_1helper.h"
 
 #include <iostream>
 
@@ -62,6 +65,9 @@ int gWindowWidth = 1280;
 int gWindowHeight = 720;
 int gRenderWidth;
 int gRenderHeight;
+
+ComPtr<IDXGIDevice> gpDxgiDevice;
+
 
 ComPtr<IXAudio2> gpXAudio2;
 IXAudio2SourceVoice* gpSourceThunder;
@@ -247,7 +253,7 @@ HRESULT LoadSoundFiles() {
 }
 
 
-void InitApp()
+void InitApp(UINT dpi)
 {
 	StartXAudio2();
 	CHECK_HR(LoadSoundFiles());
@@ -262,7 +268,7 @@ void InitApp()
     gLastFrameTicks = firstFrameTicks.QuadPart;
     gAccumulatedFrameTicks = 0;
 
-    gpRenderer = std::make_unique<Renderer>(gpDevice.Get(), gpDeviceContext.Get());
+    gpRenderer = std::make_unique<Renderer>(gpDevice.Get(), gpDeviceContext.Get(), gpDxgiDevice.Get(), dpi);
     gpRenderer->Init();
 
 #define SIM_ORBIT_RADIUS 50.f
@@ -442,7 +448,7 @@ int main()
         ComPtr<IDXGIFactory> pFactory;
         CHECK_HR(CreateDXGIFactory(IID_PPV_ARGS(&pFactory)));
 
-        UINT deviceFlags = 0;
+        UINT deviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
         deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
@@ -462,9 +468,12 @@ int main()
         scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
         CHECK_HR(D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, deviceFlags, NULL, 0, D3D11_SDK_VERSION, &scd, &gpSwapChain, &gpDevice, NULL, &gpDeviceContext));
-    }
+		CHECK_HR(gpDevice.As(&gpDxgiDevice));
 
-    InitApp();
+
+	}
+
+    InitApp(dpi);
 
     ShowWindow(ghWnd, SW_SHOWNORMAL);
 
